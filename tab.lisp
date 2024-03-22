@@ -309,7 +309,7 @@ the front of the columns list or the end.")
       (let ((i 0))
         (dotable (row table)
           (when (apply condition
-                       (coerce row 'list))
+                       row)
             (push i indices))
           (incf i)))
       (table-delete! table
@@ -424,8 +424,7 @@ the resulting aggregate table."
   ;; aggregation:
   (let* ((agg-map (make-hash-table :test test)))
     (dotable (row table)
-      (let* ((row (coerce row 'list))
-             (group (apply group-fn row)))
+      (let* ((group (apply group-fn row)))
         (let (aggfn)
           ;; ensure agg is in agg-map and get it into aggfn
           (unless (setf aggfn (gethash group agg-map))

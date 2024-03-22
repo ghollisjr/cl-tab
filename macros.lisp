@@ -11,7 +11,7 @@
            ,tab
          (do* ((,i 0 (1+ ,i)))
               ((>= ,i ,table-length) ,result)
-           (let ((,row (map 'vector (lambda (d)
+           (let ((,row (map 'list (lambda (d)
                                       (aref d ,i))
                             ,data)))
              (symbol-macrolet
