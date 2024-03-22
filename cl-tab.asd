@@ -10,4 +10,5 @@
   :components ((:file "package")
                (:file "macros")
                (:file "tab")
+               (:file "csv")
                (:file "sql")))

@@ -10,7 +10,10 @@
    :table-fields
    :table-map
    :dotable
-   ;; views
-   :make-view
+   :table-add-field!
+   :table-del-field!
+   ;; CSV
+   :table-write-csv
+   :table-read-csv
    ;; SQL
    :query))

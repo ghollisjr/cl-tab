@@ -169,3 +169,10 @@ Notes:
   be useful to e.g. avoid recomputing results in the event of an error
   that needs handling.  Most of this should probably be handled on the
   client, however.
+
+* I contemplated including views as direct objects in the underlying
+  Lisp library, but this does not seem like such a good idea since it
+  would require something more like generators in order to be useful,
+  and then the accesses to the generated data would need memoization.
+  I might return to this issue later, but in the spirit of getting
+  work done I now leave it unaddressed.

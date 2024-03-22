@@ -1,4 +1,4 @@
-(ql:quickload :cl-tab)
+(require :cl-tab)
 (in-package :tb)
 
 (defun example1 ()
