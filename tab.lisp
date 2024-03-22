@@ -251,8 +251,7 @@ the front of the columns list or the end.")
                           (vector-push-extend new-field col))
                     data
                     row)))
-        (dolist (row rows)
-          (map nil #'insert rows))
+        (map nil #'insert rows)
         table))))
 
 (defgeneric table-delete! (table condition &key &allow-other-keys)
