@@ -1,0 +1,21 @@
+* TODO [7/14] Lisp library
+- [X] Table data type
+- [X] Table mapping
+- [X] Table iteration (dotable)
+- [X] Table record insertion
+- [X] Table record deletion
+- [X] Table aggregations, including grouping
+- [ ] Table joins (full, left, right, inner)
+- [ ] Table unions
+- [X] Table CSV I/O
+- [ ] Table SQL I/O
+  UPDATE: Partially complete, tb:query can yield table from clsql
+  output.
+- [ ] cl-ana generic math integration
+- [ ] cl-ana histogram integration (especially #'bin support)
+- [ ] Table pretty-printing
+- [ ] Table reader macro (not sure on this, could work for small
+  tables)
+
+* TODO [/] DSL
+(fill in as ideas are developed)
