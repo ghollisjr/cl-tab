@@ -11,9 +11,9 @@
     table))
 
 (defun deletion-example ()
-  (let ((table (make-table '(("hello" 1)
-                             ("world" 2)
-                             ("this is" 3)
+  (let ((table (make-table '(("hello"     1)
+                             ("world"     2)
+                             ("this is"   3)
                              ("more data" 4)
                              ("to ponder" 5))
                            :fields '("message" "index"))))
