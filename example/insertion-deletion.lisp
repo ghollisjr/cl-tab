@@ -4,7 +4,8 @@
 (defun insertion-example ()
   (let ((table (make-table '(("hello" 1)
                              ("world" 2))
-                           :fields '("message" "index"))))
+                           :field-names
+                           '("message" "index"))))
     (table-insert! table
                    (list "this is" 3)
                    (list "more data" 4))
@@ -16,7 +17,8 @@
                              ("this is"   3)
                              ("more data" 4)
                              ("to ponder" 5))
-                           :fields '("message" "index"))))
+                           :field-names
+                           '("message" "index"))))
     ;; can delete a specific row by index
     (table-delete! table 1) ; -> ("world" 2) is gone
     ;; or a list of rows by indices
