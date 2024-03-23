@@ -7,7 +7,7 @@
    :make-table
    :table-ref
    :table-length
-   :table-fields
+   :table-field-names
    :table-map
    :table->list
    :table->plist
