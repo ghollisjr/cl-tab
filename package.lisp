@@ -5,6 +5,7 @@
   (:export
    :key-join
    :make-table
+   :data
    :table-ref
    :table-length
    :table-width

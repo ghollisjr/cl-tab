@@ -3,7 +3,7 @@
 (defclass table ()
   ((data :initarg :data
          :documentation "table data list of column arrays"
-         :accessor table-data
+         :accessor data
          :type list)
    (field-names :initarg :field-names
                 :documentation "list of table field names"
@@ -18,12 +18,12 @@
 (defgeneric table-length (table)
   (:documentation "Returns number of rows of table")
   (:method ((table table))
-    (length (first (table-data table)))))
+    (length (first (data table)))))
 
 (defgeneric table-width (table)
   (:documentation "Returns number of fields/columns of table")
   (:method ((table table))
-    (length (table-data table))))
+    (length (data table))))
 
 (defgeneric make-table (data &key field-names &allow-other-keys)
   (:documentation
@@ -39,7 +39,7 @@ from plists, alists, other tables, CSVs, SQL queries etc.")
                    :data
                    (unless empty-p
                      (mapcar #'alexandria:copy-array
-                             (table-data data)))
+                             (data data)))
                    :field-names (if field-names
                                     field-names
                                     (copy-list (field-names data)))
@@ -142,7 +142,7 @@ type controls type of sequence.")
     (map type
          (lambda (column)
            (aref column index))
-         (table-data table))))
+         (data table))))
 
 ;;; Table mapping:
 (defun table-map (row-fn table
@@ -229,9 +229,9 @@ the front of the columns list or the end.")
                  (t (constantly value-or-function))))
            (column
              (apply #'map 'vector fn
-                    (table-data table))))
+                    (data table))))
       (with-accessors ((field-names field-names)
-                       (data        table-data))
+                       (data        data))
           table
         (if end-p
             (setf data (nconc data (list column))
@@ -244,7 +244,7 @@ the front of the columns list or the end.")
   (:documentation "Remove column from table specified by name or index.")
   (:method ((table table) name-or-index)
     (with-accessors ((field-names field-names)
-                     (data table-data))
+                     (data data))
         table
       (let* ((index
                (typecase name-or-index
@@ -267,7 +267,7 @@ the front of the columns list or the end.")
 (defgeneric insert! (table &rest rows)
   (:documentation "Insert row into table.  Rows should be lists.")
   (:method ((table table) &rest rows)
-    (with-accessors ((data table-data)) table
+    (with-accessors ((data data)) table
       (flet ((insert (row)
                (map nil (lambda (col new-field)
                           (vector-push-extend new-field col))
@@ -291,7 +291,7 @@ the front of the columns list or the end.")
   ;; :sorted-p t -> no need to sort indices
   (:method ((table table) (condition list) &key sorted-p &allow-other-keys)
     (declare (optimize (debug 3)))
-    (with-accessors ((data table-data))
+    (with-accessors ((data data))
         table
       (let ((table-length (table-length table))
             (sorted (if sorted-p
@@ -337,6 +337,13 @@ the front of the columns list or the end.")
       (delete! table
                (nreverse indices)
                :sorted-p t))))
+
+(defgeneric truncate! (table)
+  (:documentation "Truncates table (deletes all rows, preserves
+ structure).")
+  (:method ((table table))
+    (map nil (lambda (column) (adjust-array column 0 :fill-pointer t))
+         (data table))))
 
 ;;; Aggregations:
 ;;;

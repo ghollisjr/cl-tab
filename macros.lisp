@@ -7,12 +7,12 @@
     `(let ((,tab ,table))
        (with-accessors ((,table-width table-width)
                         (,table-length table-length)
-                        (,data table-data))
+                        (,data data))
            ,tab
          (do* ((,i 0 (1+ ,i)))
               ((>= ,i ,table-length) ,result)
            (let ((,row (map 'list (lambda (d)
-                                      (aref d ,i))
+                                    (aref d ,i))
                             ,data)))
              (symbol-macrolet
                  ,(if (listp vars)
