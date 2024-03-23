@@ -11,7 +11,7 @@
 ;;;;
 ;;;; * To generate data more useful for foreign tools, use the
 ;;;;   :lisp-output-p argument and set it to NIL when running
-;;;;   #'table-write-csv.  This will lead to default formatting for
+;;;;   #'write-csv.  This will lead to default formatting for
 ;;;;   output as per the other arguments passed through to the cl-csv
 ;;;;   functions, which usually leads to useful interpretation by
 ;;;;   foreign tools.
@@ -24,16 +24,16 @@
 ;;;;   generic table operations.  This could be changed in the future.
 (in-package :tb)
 
-(defun table-write-csv (table
-                        &key
-                          stream
-                          (lisp-output-p t)
-                          (separator cl-csv:*separator*)
-                          (field-names nil field-names-supplied-p)
-                          (quote cl-csv:*quote*)
-                          (escape cl-csv:*quote-escape*)
-                          (always-quote cl-csv::*always-quote*)
-                          (newline cl-csv::*write-newline*))
+(defun write-csv (table
+                  &key
+                    stream
+                    (lisp-output-p t)
+                    (separator cl-csv:*separator*)
+                    (field-names nil field-names-supplied-p)
+                    (quote cl-csv:*quote*)
+                    (escape cl-csv:*quote-escape*)
+                    (always-quote cl-csv::*always-quote*)
+                    (newline cl-csv::*write-newline*))
   "Writes table as CSV to output stream using delimiter and either the
 field-names from the table or those provided as a keyword argument.
 If :field-names NIL is used, then no field names will be written and
@@ -61,14 +61,14 @@ cl-csv:write-csv... functions, so they have the same usage."
             ;; Three usages:
             ;; 1. Just use table's field names
             ((null field-names-supplied-p)
-             (table-field-names table))
+             (field-names table))
             ;; 2. Use custom field names that were supplied:
             (field-names field-names)
             ;; 3. :field-names nil was supplied, don't write field names
             ((null field-names) nil))))
     (when field-names
       (apply #'cl-csv:write-csv-row
-             (table-field-names table)
+             (field-names table)
              :stream stream
              :separator separator
              cl-csv-keyargs))
@@ -87,19 +87,19 @@ cl-csv:write-csv... functions, so they have the same usage."
              :separator separator
              cl-csv-keyargs))))
 
-(defun table-read-csv (stream-or-string
-                       &key
-                         (lisp-input-p t)
-                         (field-names nil field-names-supplied-p)
-                         csv-reader row-fn map-fn data-map-fn sample skip-first-p
-                         (separator cl-csv:*separator*)
-                         (quote cl-csv:*quote*)
-                         (escape cl-csv:*quote-escape*)
-                         (unquoted-empty-string-is-nil cl-csv::*unquoted-empty-string-is-nil*)
-                         (quoted-empty-string-is-nil cl-csv::*quoted-empty-string-is-nil*)
-                         (trim-outer-whitespace cl-csv::*trim-outer-whitespace*)
-                         (newline cl-csv::*read-newline*)
-                         (escape-mode cl-csv::*escape-mode*))
+(defun read-csv (stream-or-string
+                 &key
+                   (lisp-input-p t)
+                   (field-names nil field-names-supplied-p)
+                   csv-reader row-fn map-fn data-map-fn sample skip-first-p
+                   (separator cl-csv:*separator*)
+                   (quote cl-csv:*quote*)
+                   (escape cl-csv:*quote-escape*)
+                   (unquoted-empty-string-is-nil cl-csv::*unquoted-empty-string-is-nil*)
+                   (quoted-empty-string-is-nil cl-csv::*quoted-empty-string-is-nil*)
+                   (trim-outer-whitespace cl-csv::*trim-outer-whitespace*)
+                   (newline cl-csv::*read-newline*)
+                   (escape-mode cl-csv::*escape-mode*))
   "Read CSV file into a table from stream-or-string using cl-csv read
 functions.
 

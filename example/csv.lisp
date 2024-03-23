@@ -4,7 +4,7 @@
 (defun example-write-csv ()
   "Example writing CSV to a string with Lisp-formatted data and
 Unix line endings."
-  (table-write-csv
+  (write-csv
    (make-table '(("hello with space" 1)
                  ("world"            2))
                :field-names (list "message" "x"))
@@ -16,4 +16,4 @@ Unix line endings."
     (format t "Example: Read CSV data~%")
     (format t "Input CSV file:~%~c~%" #\page)
     (format t "~a~c~%" csv-data #\page)
-  (table-read-csv csv-data)))
+    (read-csv csv-data)))

@@ -7,7 +7,7 @@
          :type list)
    (field-names :initarg :field-names
                 :documentation "list of table field names"
-                :accessor table-field-names
+                :accessor field-names
                 :type list)
    (indices :initform nil
             :initarg :indices
@@ -42,7 +42,7 @@ from plists, alists, other tables, CSVs, SQL queries etc.")
                              (table-data data)))
                    :field-names (if field-names
                                     field-names
-                                    (copy-list (table-field-names data)))
+                                    (copy-list (field-names data)))
                    :indices (when (and copy-indices-p
                                        (not empty-p))
                               (copy-tree (table-indices data))))))
@@ -188,7 +188,7 @@ yields field/column.  For list, result is a list of field-lists."
       (plist
        (let* ((field-names
                 (or field-names
-                    (table-field-names table)))
+                    (field-names table)))
               (field-syms (mapcar (lambda (s) (intern s :keyword))
                                   field-names)))
          (mapcar (lambda (row)
@@ -209,11 +209,11 @@ yields field/column.  For list, result is a list of field-lists."
   (table-map #'list table :type 'array))
 
 ;;; Column addition:
-(defgeneric table-add-field! (table name
-                              &optional value-or-function
-                              &key
-                                end-p
-                              &allow-other-keys)
+(defgeneric add-field! (table name
+                        &optional value-or-function
+                        &key
+                          end-p
+                        &allow-other-keys)
   (:documentation "Adds a new column to table with name and either a fixed value or a
 function which will be supplied the table's other fields as distinct
 arguments and which should return a value to insert as the new field
@@ -230,7 +230,7 @@ the front of the columns list or the end.")
            (column
              (apply #'map 'vector fn
                     (table-data table))))
-      (with-accessors ((field-names table-field-names)
+      (with-accessors ((field-names field-names)
                        (data        table-data))
           table
         (if end-p
@@ -240,10 +240,10 @@ the front of the columns list or the end.")
                   field-names (cons name field-names)))))
     table))
 
-(defgeneric table-del-field! (table name-or-index)
+(defgeneric del-field! (table name-or-index)
   (:documentation "Remove column from table specified by name or index.")
   (:method ((table table) name-or-index)
-    (with-accessors ((field-names table-field-names)
+    (with-accessors ((field-names field-names)
                      (data table-data))
         table
       (let* ((index
@@ -264,7 +264,7 @@ the front of the columns list or the end.")
                        collecting d))
         table))))
 
-(defgeneric table-insert! (table &rest rows)
+(defgeneric insert! (table &rest rows)
   (:documentation "Insert row into table.  Rows should be lists.")
   (:method ((table table) &rest rows)
     (with-accessors ((data table-data)) table
@@ -276,7 +276,7 @@ the front of the columns list or the end.")
         (map nil #'insert rows)
         table))))
 
-(defgeneric table-delete! (table condition &key &allow-other-keys)
+(defgeneric delete! (table condition &key &allow-other-keys)
   (:documentation "Deletes rows indicated by condition.  condition can be one of:
 
 * integer index: delete specific row indicated by index.
@@ -324,7 +324,7 @@ the front of the columns list or the end.")
           table))))
   ;; Single-index case:
   (:method ((table table) (condition integer) &key &allow-other-keys)
-    (table-delete! table (list condition)))
+    (delete! table (list condition)))
   ;; Boolean function case:
   (:method ((table table) (condition function) &key &allow-other-keys)
     (let ((indices nil))
@@ -334,9 +334,9 @@ the front of the columns list or the end.")
                        row)
             (push i indices))
           (incf i)))
-      (table-delete! table
-                     (nreverse indices)
-                     :sorted-p t))))
+      (delete! table
+               (nreverse indices)
+               :sorted-p t))))
 
 ;;; Aggregations:
 ;;;
@@ -344,7 +344,7 @@ the front of the columns list or the end.")
 ;;; suitable, beautiful, Lispy expression, but ultimately the answer
 ;;; was simple: Closures.
 ;;;
-;;; - There is a main aggregation function: #'table-aggregate.  This
+;;; - There is a main aggregation function: #'aggregate.  This
 ;;;   function processes a table to compute one aggregation via a
 ;;;   supplied function argument.  This might seem limited, however:
 ;;;   This one aggregation is interpreted as a row of data, so that if
@@ -367,7 +367,7 @@ the front of the columns list or the end.")
 ;;; - The macro with-aggregation helps define a new aggregation using
 ;;;   a set of existing aggregate functions (or functions created in
 ;;;   the aggregate bindings, advanced usage) that can immediately be
-;;;   used to return an aggregate table using #'table-aggregate.
+;;;   used to return an aggregate table using #'aggregate.
 
 ;; Some basic aggregate functions:
 (defun agg (fn &optional (default-value 0))
@@ -381,7 +381,7 @@ Use this as a reference implementation for your own aggregation functions: They 
     (declare (ignore group))
     (let ((acc default-value))
       (lambda (&optional
-            (datum nil datum-supplied-p))
+                 (datum nil datum-supplied-p))
         (if datum-supplied-p
             (setf acc (funcall fn acc datum))
             acc)))))
@@ -394,14 +394,14 @@ Use this as a reference implementation for your own aggregation functions: They 
              (1+ v))
            0))
 (setf (documentation #'agg-count 'function)
-      "Counting aggregation for use with table-aggregate.  See all aggregates
+      "Counting aggregation for use with aggregate.  See all aggregates
 via (apropos \"agg-\")")
 
 ;; Sum aggregation
 (setf (symbol-function 'agg-sum)
       (agg #'+ 0))
 (setf (documentation #'agg-sum 'function)
-      "Sum aggregation for use with table-aggregate.  See all aggregates
+      "Sum aggregation for use with aggregate.  See all aggregates
 via (apropos \"agg-\")")
 
 ;; (Natural) Log-sum aggregration (log of product)
@@ -411,7 +411,7 @@ via (apropos \"agg-\")")
            0))
 (setf (documentation #'agg-log-sum 'function)
       "Sum-of-logs or log-of-product aggregation for use with
-table-aggregate.  See all aggregates via (apropos \"agg-\")")
+aggregate.  See all aggregates via (apropos \"agg-\")")
 
 ;; Mean aggregation
 (defun agg-mean (&optional (type 'number))
@@ -426,11 +426,11 @@ table-aggregate.  See all aggregates via (apropos \"agg-\")")
                   sum (+ sum datum))
             (cl-ana.gmath:protected-/ sum count))))))
 
-(defun table-aggregate (aggregator table
-                        &key
-                          (group-fn (constantly t))
-                          (test 'equal)
-                          field-names)
+(defun aggregate (aggregator table
+                  &key
+                    (group-fn (constantly t))
+                    (test 'equal)
+                    field-names)
   "Return the aggregation produced by
 
 1. Grouping records by the group function group-fn, with distinction
@@ -477,7 +477,7 @@ fsym as a callable function, e.g. (fsym ...) will work correclty as
 will (funcall #'fsym ...).
 
 This is useful for creating an aggregation to use with
-table-aggregate.
+aggregate.
 
 The first forms in agg-body can be declarations for the generated
 aggregation function, i.e. they can declare things about the arguments
@@ -526,17 +526,17 @@ in the lambda list but not about the group (might fix in future)."
 ;; list to be joined, or NIL to denote the case where there are no
 ;; values from the corresponding table for that row in the joined
 ;; table.
-(defun table-join (tables indices-lists-or-fn
-                   &key
-                     (row-fn #'append)
-                     field-names)
+(defun join (tables indices-lists-or-fn
+             &key
+               (row-fn #'append)
+               field-names)
   "Joins tables using indices-lists.  tables is a list of tables to join.
 indices-lists is a list of row indices for each table that must be
 joined to form"
   (let* ((field-names
            (or field-names
                (apply #'append
-                      (mapcar #'table-field-names tables))))
+                      (mapcar #'field-names tables))))
          (indices-lists
            (typecase indices-lists-or-fn
              (list indices-lists-or-fn)
@@ -564,7 +564,7 @@ joined to form"
 (defun on (condition
            &key
              (type :inner))
-  "Returns a function that returns indices-lists for use with table-join
+  "Returns a function that returns indices-lists for use with join
 when supplied with input tables as distinct arguments.  condition must
 be a function that accepts a row argument from each table and returns
 a list of booleans denoting whether to include a row from each table
