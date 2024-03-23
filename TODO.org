@@ -5,7 +5,43 @@
 - [X] Table record insertion
 - [X] Table record deletion
 - [X] Table aggregations, including grouping
-- [ ] Table joins (full, left, right, inner)
+- [ ] Table joins (full, left, right, inner) UPDATE: I've implemented
+  a version of table-join and #'on that work well for inner joins, but
+  I want a different style of join for this library.  The calling
+  protocol should look something like this:
+
+  (join tab1
+      (on tab2
+          (lambda (r2 r1)
+            ...)
+          :type :inner)
+      (on tab3
+          (lambda (r3 r2 r1)
+            ...)
+          :type :left)
+      ...)
+
+  where the idea is that the functions
+
+  (defun join (table &rest on-fns) ...)
+  (defun on (table condition &key (type :inner)))
+
+  drive the join.  There would be specialized joins for cases that
+  should be highly optimized, but the main idea of using indices-lists
+  should still be the backbone of the algorithm.  The other main idea
+  is that the condition functions receive arguments placed in the
+  reverse order as they appear in the join call.  This is to allow a
+  function to simply ignore tables that aren't interesting for the
+  join.  I'm not 100% sold on that idea, but it does seem elegant.
+  Another option is to have a keyword in the #'on function that
+  controls the order of argument supply.
+
+  The return type of #'on must facilitate all of this.  Currently,
+  #'on returns a function that accepts table arguments and generates a
+  list of row indices from each table that are present in an inner
+  join of those tables with the condition applied.  Supporting left,
+  right, and full joins should be much simpler when the operations are
+  always binary and left-associative.
 - [ ] Table unions
 - [X] Table CSV I/O
 - [ ] Table SQL I/O

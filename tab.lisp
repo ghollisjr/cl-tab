@@ -154,9 +154,9 @@ distinct argument to row-fn, and returning a new table with fields
 specified by field-names.  row-fn should return a list of new field
 values.
 
-type can be one of 'table, 'array, or 'list to yield difference result
-types.  For array, first index yields row, second yields field/column.
-For list, result is a list of field-lists."
+type can be one of 'table, 'array, 'list, or 'plist to yield
+difference result types.  For array, first index yields row, second
+yields field/column.  For list, result is a list of field-lists."
   (let ((length (table-length table)))
     (case type
       (table
@@ -184,7 +184,29 @@ For list, result is a list of field-lists."
          for i below length
          collecting
          (apply row-fn
-                (table-ref table i :type 'list)))))))
+                (table-ref table i :type 'list))))
+      (plist
+       (let* ((field-names
+                (or field-names
+                    (table-field-names table)))
+              (field-syms (mapcar (lambda (s) (intern s :keyword))
+                                  field-names)))
+         (mapcar (lambda (row)
+                   (mapcan (lambda (k f)
+                             (list k f))
+                           field-syms
+                           row))
+                 (table-map row-fn table :type 'list)))))))
+
+;; Utilities using map:
+(defun table->plist (table)
+  (table-map #'list table :type 'plist))
+
+(defun table->list (table)
+  (table-map #'list table :type 'list))
+
+(defun table->array (table)
+  (table-map #'list table :type 'array))
 
 ;;; Column addition:
 (defgeneric table-add-field! (table name
@@ -488,3 +510,118 @@ in the lambda list but not about the group (might fix in future)."
                  (if ,args
                      (progn ,@agg-body)
                      ,agg-result)))))))))
+
+;;; Joins
+;;;
+;;; Joins are a place where some real benefits can be had through
+;;; Lisp's flexible syntax and functional techniques.
+
+;; Main join function:
+;;
+;; This function does not directly implement join logic, but instead
+;; joins a list of tables using a list of row indices that specify the
+;; rows that should be associated with each other in each table.
+;;
+;; Each list in indices-lists must be a list of valid indices for each
+;; list to be joined, or NIL to denote the case where there are no
+;; values from the corresponding table for that row in the joined
+;; table.
+(defun table-join (tables indices-lists-or-fn
+                   &key
+                     (row-fn #'append)
+                     field-names)
+  "Joins tables using indices-lists.  tables is a list of tables to join.
+indices-lists is a list of row indices for each table that must be
+joined to form"
+  (let* ((field-names
+           (or field-names
+               (apply #'append
+                      (mapcar #'table-field-names tables))))
+         (indices-lists
+           (typecase indices-lists-or-fn
+             (list indices-lists-or-fn)
+             (function (apply indices-lists-or-fn tables))))
+         (data
+           (loop
+             for indices in indices-lists
+             collecting
+             (apply row-fn
+                    (mapcar (lambda (tab index)
+                              (if index
+                                  (table-ref tab index)
+                                  (loop repeat (table-width tab)
+                                        collect nil)))
+                            tables
+                            indices)))))
+    (make-table data :field-names field-names)))
+
+;; Essential join helper function: on
+;;
+;; This is seldom the best choice, but is the most general choice for
+;; joining tables.
+(declaim (function %on)) ; helper function
+
+(defun on (condition
+           &key
+             (type :inner))
+  "Returns a function that returns indices-lists for use with table-join
+when supplied with input tables as distinct arguments.  condition must
+be a function that accepts a row argument from each table and returns
+a list of booleans denoting whether to include a row from each table
+argument.
+
+This function performs N nested loops, where N is the number of tables
+supplied as input arguments, and loops over all tables.  Hence, this
+function is seldom the most efficient choice for common join tasks,
+but is capable of any join.
+
+type can be one of :full, :left, :right, or :inner, specifying how
+results will be included in the event that the condition is false."
+  (lambda (&rest tables)
+    (let ((result
+            (apply (%on condition) ; core algorithm is in %on
+                   tables)))
+      (when result
+        (let ((width (/ (length (first result)) 2)))
+          (mapcar (lambda (x)
+                    (nreverse (subseq x 0 width)))
+                  result))))))
+
+(defun %on (condition &key (type :inner))
+  "Helper function for on.  Returns results that have indices reversed
+and appended to the front of the boolean list."
+  (lambda (&rest tables)
+    (declare (optimize (debug 3)))
+    (let ((result nil)
+          (index 0))
+      (destructuring-bind (tab &rest tabs)
+          tables
+        (if tabs
+            (dotable (row tab)
+              (setf result
+                    (nconc result
+                           (apply (%on (lambda (&rest rows)
+                                         (let ((con
+                                                 (apply condition
+                                                        row rows)))
+                                           (when (some #'identity con)
+                                             (cons index con)))))
+                                  tabs)))
+              (incf index))
+            (dotable (row tab)
+              (setf result
+                    (nconc result
+                           (let ((con (funcall condition row)))
+                             (when (some #'identity con)
+                               (list
+                                (cons index
+                                      con))))))
+              (incf index))))
+      result)))
+
+;; (defun on-keys (&rest tk->tks)
+;;   "Returns a function that, when supplied with a list of tables as
+;; inputs, will return the indices-lists for the columns that should be
+;; present in the joined table.
+
+;; Each tk->tks should have the following form"
