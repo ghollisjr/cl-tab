@@ -2,6 +2,7 @@
   (:nicknames :tb)
   (:use
    :cl)
+  (:shadow :union)
   (:export
    :key-join
    :make-table
@@ -20,6 +21,7 @@
    :insert!
    :delete!
    :join
+   :union
    :on
    :aggregate
    :agg
@@ -27,6 +29,7 @@
    :agg-count
    :agg-log-sum
    :agg-mean
+   :tlet
    ;; CSV
    :write-csv
    :read-csv

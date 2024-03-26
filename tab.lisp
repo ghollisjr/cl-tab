@@ -556,162 +556,6 @@ in the lambda list but not about the group (might fix in future)."
 ;;; Joins are a place where some real benefits can be had through
 ;;; Lisp's flexible syntax and functional techniques.
 
-;; Main join function:
-;;
-;; This function does not directly implement join logic, but instead
-;; joins a list of tables using a list of row indices that specify the
-;; rows that should be associated with each other in each table.
-;;
-;; Each list in indices-lists must be a list of valid indices for each
-;; list to be joined, or NIL to denote the case where there are no
-;; values from the corresponding table for that row in the joined
-;; table.
-(defun join (tables indices-lists-or-fn
-             &key
-               (row-fn #'append)
-               field-names)
-  "Joins tables using indices-lists.  tables is a list of tables to join.
-indices-lists is a list of row indices for each table that must be
-joined to form"
-  (let* ((field-names
-           (or field-names
-               (apply #'append
-                      (mapcar #'field-names tables))))
-         (indices-lists
-           (typecase indices-lists-or-fn
-             (list indices-lists-or-fn)
-             (function (apply indices-lists-or-fn tables))))
-         (data
-           (loop
-             for indices in indices-lists
-             collecting
-             (apply row-fn
-                    (mapcar (lambda (tab index)
-                              (if index
-                                  (table-ref tab index)
-                                  (loop repeat (table-width tab)
-                                        collect nil)))
-                            tables
-                            indices)))))
-    (make-table data :field-names field-names)))
-
-;; Essential join helper function: on
-;;
-;; This is seldom the best choice, but is the most general choice for
-;; joining tables.
-(declaim (function %on)) ; helper function
-
-(defun on (condition
-           &key
-             (type :inner))
-  "Returns a function that returns indices-lists for use with join
-when supplied with input tables as distinct arguments.  condition must
-be a function that accepts a row argument from each table and returns
-a list of booleans denoting whether to include a row from each table
-argument.
-
-This function performs N nested loops, where N is the number of tables
-supplied as input arguments, and loops over all tables.  Hence, this
-function is seldom the most efficient choice for common join tasks,
-but is capable of any join.
-
-type can be one of :full, :left, :right, or :inner, specifying how
-results will be included in the event that the condition is false."
-  (lambda (&rest tables)
-    (let ((result
-            (apply (%on condition) ; core algorithm is in %on
-                   tables)))
-      (when result
-        (let ((width (/ (length (first result)) 2)))
-          (mapcar (lambda (x)
-                    (nreverse (subseq x 0 width)))
-                  result))))))
-
-(defun %on (condition &key (type :inner))
-  "Helper function for on.  Returns results that have indices reversed
-and appended to the front of the boolean list."
-  (lambda (&rest tables)
-    (declare (optimize (debug 3)))
-    (let ((result nil)
-          (index 0))
-      (destructuring-bind (tab &rest tabs)
-          tables
-        (if tabs
-            (dotable (row tab)
-              (setf result
-                    (nconc result
-                           (apply (%on (lambda (&rest rows)
-                                         (let ((con
-                                                 (apply condition
-                                                        row rows)))
-                                           (when (some #'identity con)
-                                             (cons index con)))))
-                                  tabs)))
-              (incf index))
-            (dotable (row tab)
-              (setf result
-                    (nconc result
-                           (let ((con (funcall condition row)))
-                             (when (some #'identity con)
-                               (list
-                                (cons index
-                                      con))))))
-              (incf index))))
-      result)))
-
-;;; Attempt at join #2:
-;;;
-;;; This time, a compositional/functional approach is taken.
-;;;
-;;; (join table &rest join-lists)
-;;;
-;;; Each join-list is a list of the form (table on-fn) where on-fn is
-;;; a function that accepts two tables as input and returns a list of
-;;; row index lists.  The number of row index lists is the length of
-;;; the new joined table, and each row index list must have exactly 2
-;;; elements, each being either a row index from the corresponding
-;;; table or NIL denoting that this particular row only contains data
-;;; from one of the tables.
-;;;
-;;; Previously I had allowed a list of index lists to be suppiled to
-;;; denote a simple index-specified join, but to support a more
-;;; generally aesthetic syntax, I instead provide #'on-indices which
-;;; simply wraps a list of index lists in a function that is suitable
-;;; for #'join.
-
-;; (defun join (table &rest join-lists)
-;;   "Joins a table using the join-lists supplied.  Each join-list must be of the form
-
-;; (other-table on-fn &optional type)
-
-;; where other-table is a table to join, type is one of :inner (default),
-;; :left, :right, or :full, and on-fn is a function that accepts a list
-;; of rows from the tables involved in the join thus far, supplied in
-;; order from most recent to least (e.g. table[N] table[N-1] ... table)
-;; and returns a list of booleans specifying the rows to be included in
-;; the resulting table.  Each boolean list must be of length 2, and at
-;; most one of the elements may be NIL with the other being non-NIL.  If
-;; a boolean is NIL, this means that the data from the corresponding
-;; table should not be included in the joined table but the data from the
-;; other table should be included.  (This is necessary for outer joins.)
-
-;; For convience, use #'on to create on-fns from boolean condition
-;; functions."
-;;   (let* ((tables (list* table (mapcar #'car join-lists)))
-;;          (on-fns (mapcar #'cdr join-lists))
-;;          (widths (mapcar #'table-width tables))
-;;          (result nil))
-;;     (labels ((jn (t1 t2 on &optional (type :inner))
-;;                (
-;;   )
-
-;; (defun on-keys (&rest tk->tks)
-;;   "Returns a function that, when supplied with a list of tables as
-;; inputs, will return the indices-lists for the columns that should be
-;; present in the joined table.
-
-;; Each tk->tks should have the following form"
-
 ;; Starting from simple approach: Binary join functions
 (defun %join-loop (t1 t2 condition-fn
                    &key (type :inner)
@@ -779,6 +623,13 @@ or NIL when a join of the rows should be accepted or rejected.
     (make-table (nreverse result) :field-names field-names)))
 
 ;; Binary hash equijoin function:
+;;
+;; Arbitrary hashes of rows are also supported by passing (lfn rfn) as
+;; eqs instead of a list of equivalent field names/indices.
+;;
+;; NOTE: This function still supports the index joining, but I have
+;; not used this in the general #'join front-end function, as the
+;; explicit function is sufficient.
 (defun %join-hash (t1 t2 eqs
                    &key
                      (test 'equal)
@@ -787,7 +638,12 @@ or NIL when a join of the rows should be accepted or rejected.
   "Uses hash tables to match rows using lists of keys on which to join
 the tables as specified in eqs.
 
-eqs should be a list of equivalence lists.  Each equivalence list should contain 2 elements:
+eqs should be a list of equivalence lists or a list of two functions
+that will be applied to the input rows (with fields supplied as
+distinct arguments) to compute values to use as hash keys.
+
+When using equivalence lists, each equivalence list should contain 2
+elements:
 
 * A field name or index from t1.
 * A field name or index from t2.
@@ -820,109 +676,236 @@ type can be one of :inner (default), :left, :right, or :full."
          ;; results pushed into list instead of table for efficiency
          (result nil)
          (lmap (make-hash-table :test test))
-         (rmap (make-hash-table :test test))
-         (rfspecs (mapcar #'first eqs))
-         (lfspecs (mapcar #'second eqs))
-         (rfindices (sort (loop
-                            for f in rfspecs
-                            collecting
-                            (if (integerp f)
-                                f
-                                (position f
-                                          (field-names t1)
-                                          :test #'equal)))
-                          #'<))
-         (lfindices (sort (loop
-                            for f in lfspecs
-                            collecting
-                            (if (integerp f)
-                                f
-                                (position f
-                                          (field-names t1)
-                                          :test #'equal)))
-                          #'<)))
-    (labels (;; functions to grab keys for right and left tables
-             (getfields (row indices)
-               (do* ((r row (cdr r))
-                     (f (car r) (car r))
-                     (i 0 (1+ i))
-                     (result nil)
-                     (tail nil))
-                    ((or (null indices)
-                         (null r))
-                     result)
-                 (when (= i (car indices))
-                   (if result
-                       (setf (cdr tail) (cons f nil)
-                             tail (cdr tail))
-                       (setf result
-                             (setf tail (cons f nil))))
-                   (setf indices (cdr indices)))))
-             (rfields (row)
-               (getfields row rfindices))
-             (lfields (row)
-               (getfields row lfindices)))
-      ;; setup maps
-      (let ((i -1))
-        (dotable (r1 t1)
-          (push (incf i) (gethash (lfields r1) lmap))))
-      (let ((i -1))
-        (dotable (r2 t2)
-          (push (incf i) (gethash (rfields r2) rmap))))
-      ;; Push intersection results:
-      (loop
-        for k being the hash-keys in lmap
-        for lindices being the hash-values in lmap
-        do
-           (let ((rindices (gethash k rmap)))
-             ;; mark rows as being inserted
-             (when (and lindices rindices)
-               (map nil
-                    (lambda (indices)
-                      (map nil
-                           (lambda (i)
-                             (when (zerop (elt indices i))
-                               (setf (elt indices i) 1)))
-                           indices))
-                    (list li ri)))
-             ;; insert intersection rows
-             (when rindices
-               (let ((r1s (mapcar (lambda (i)
-                                    (table-ref t1 i))
-                                  lindices))
-                     (r2s (mapcar (lambda (i)
-                                    (table-ref t2 i))
-                                  rindices)))
-                 (dolist (r1 r1s)
-                   (dolist (r2 r2s)
-                     (push (append r1 r2)
-                           result)))))))
-      ;; Handle left/right/full non-intersections:
-      (labels ((lins ()
-                 (dotimes (i (length li))
-                   (let ((present (plusp (elt li i))))
-                     (unless present
-                       (push (append (table-ref t1 i)
-                                     (loop
-                                       repeat (table-width t2)
-                                       collect nil))
-                             result)))))
-               (rins ()
-                 (dotimes (i (length ri))
-                   (let ((present (plusp (elt ri i))))
-                     (unless present
-                       (push (append (loop
-                                       repeat (table-width t1)
-                                       collect nil)
-                                     (table-ref t2 i))
-                             result))))))
-        (case type
-          (:full (lins) (rins))
-          (:left (lins))
-          (:right (rins))))
-      ;; Return result:
-      (make-table (nreverse result)
-                  :field-names field-names))))
+         (rmap (make-hash-table :test test)))
+    (let* ((leq-p (not (functionp (first eqs))))
+           (req-p (not (functionp (second eqs))))
+           (lfspecs (when leq-p (mapcar #'second eqs)))
+           (rfspecs (when req-p (mapcar #'first eqs)))
+           (lfindices (when leq-p
+                        (sort (loop
+                                for f in lfspecs
+                                collecting
+                                (if (integerp f)
+                                    f
+                                    (position f
+                                              (field-names t1)
+                                              :test #'equal)))
+                              #'<)))
+           (rfindices (when req-p
+                        (sort (loop
+                                for f in rfspecs
+                                collecting
+                                (if (integerp f)
+                                    f
+                                    (position f
+                                              (field-names t1)
+                                              :test #'equal)))
+                              #'<))))
+      (labels (;; functions to grab keys for right and left tables
+               (getfields (row indices)
+                 (do* ((r row (cdr r))
+                       (f (car r) (car r))
+                       (i 0 (1+ i))
+                       (result nil)
+                       (tail nil))
+                      ((or (null indices)
+                           (null r))
+                       result)
+                   (when (= i (car indices))
+                     (if result
+                         (setf (cdr tail) (cons f nil)
+                               tail (cdr tail))
+                         (setf result
+                               (setf tail (cons f nil))))
+                     (setf indices (cdr indices)))))
+               (rfields (row)
+                 (getfields row rfindices))
+               (lfields (row)
+                 (getfields row lfindices)))
+        (let* ((lkey (if leq-p
+                         #'lfields
+                         (lambda (x) (apply (first eqs) x))))
+               (rkey (if req-p
+                         #'rfields
+                         (lambda (x) (apply (second eqs) x)))))
+          ;; setup maps
+          (let ((i -1))
+            (dotable (r1 t1)
+              (push (incf i) (gethash (funcall lkey r1) lmap))))
+          (let ((i -1))
+            (dotable (r2 t2)
+              (push (incf i) (gethash (funcall rkey r2) rmap)))))
+        ;; Push intersection results:
+        (loop
+          for k being the hash-keys in lmap
+          for lindices being the hash-values in lmap
+          do
+             (let ((rindices (gethash k rmap)))
+               ;; mark rows as being inserted
+               (when (and lindices rindices)
+                 (map nil
+                      (lambda (indices)
+                        (map nil
+                             (lambda (i)
+                               (when (zerop (elt indices i))
+                                 (setf (elt indices i) 1)))
+                             indices))
+                      (list li ri)))
+               ;; insert intersection rows
+               (when rindices
+                 (let ((r1s (mapcar (lambda (i)
+                                      (table-ref t1 i))
+                                    lindices))
+                       (r2s (mapcar (lambda (i)
+                                      (table-ref t2 i))
+                                    rindices)))
+                   (dolist (r1 r1s)
+                     (dolist (r2 r2s)
+                       (push (append r1 r2)
+                             result)))))))
+        ;; Handle left/right/full non-intersections:
+        (labels ((lins ()
+                   (dotimes (i (length li))
+                     (let ((present (plusp (elt li i))))
+                       (unless present
+                         (push (append (table-ref t1 i)
+                                       (loop
+                                         repeat (table-width t2)
+                                         collect nil))
+                               result)))))
+                 (rins ()
+                   (dotimes (i (length ri))
+                     (let ((present (plusp (elt ri i))))
+                       (unless present
+                         (push (append (loop
+                                         repeat (table-width t1)
+                                         collect nil)
+                                       (table-ref t2 i))
+                               result))))))
+          (case type
+            (:full (lins) (rins))
+            (:left (lins))
+            (:right (rins))))
+        ;; Return result:
+        (make-table (nreverse result)
+                    :field-names field-names)))))
 
 ;; Now provide nice front-end to the two previous binary join
 ;; operations:
+(defgeneric on (table condition &key type &allow-other-keys)
+  (:documentation "Returns a specification for a join condition that can be used by
+#'join to compute the join using the best approach.")
+  (:method ((table table) (condition function)
+            &key (type :inner) &allow-other-keys)
+    (list :loop table condition type))
+  (:method ((table table) (condition list)
+            &key (type :inner) (test 'equal) &allow-other-keys)
+    (list :hash table condition type test)))
+
+(defun reverse-group-list (list group-lengths)
+  "Returns elements from list grouped into group sizes specified by
+group-lengths."
+  (let ((l list))
+    (nreverse
+     (mapcar (lambda (g)
+               (prog1 (subseq l 0 g)
+                 (setf l (nthcdr g l))))
+             group-lengths))))
+
+(defun join (table &rest joins)
+  "Performs a series of joins on table using the specified list of joins.
+
+Each join is a join specification returned by the #'on function.
+
+Example of joining 3 tables first using a primary & foreign
+key (efficient, uses hash tables to join) followed by a more general
+condition (inefficient, uses nested loop):
+
+(join t1
+      ;; key/hash join:
+      (on t2
+          ;; List of functions to generate values to hash & compare,
+          ;; one from left table(s), one from right table
+          (list (lambda (r1)
+                 (let ((foreign-key (elt r1 1)))
+                  foreign-key))
+                (lambda (r2)
+                 (let ((primary-key (elt r2 0)))
+                  primary-key)))
+             :type :inner)
+      ;; general condition join:
+      (on t3 (lambda (r3 r2 r1) (evenp (+ (elt r3 0) (elt r2 1))))
+          :type :inner))
+
+* Note that the arguments to the first condition in a key/hash join's
+  left function are the rows of the already-joined tables in reverse
+  order of the table occurrences.  This is to make it convenient to
+  ignore arguments for tables that are unlikely to be involved in
+  future joins.
+
+* Note that the arguments to the second join's condition function are
+  rows from the tables supplied in reverse order to the occurence of
+  tables in the join.  This was chosen to make it convenient to ignore
+  arguments for tables that are unlikely to be involved in future
+  joins."
+  (declare (optimize (debug 3)))
+  (let* ((result table)
+         (tables (cons table
+                       (mapcar #'second joins)))
+         (table-widths (mapcar #'table-width tables)))
+    (loop
+      for join in joins
+      for i from 0
+      for algo = (first join) ; e.g. :loop, :hash
+      for table = (second join)
+      for condition = (third join)
+      for type = (fourth join) ; e.g. :inner
+      for join-test = (fifth join)
+      for traversed = (list result) then (append traversed (list table))
+      do
+         (setf result
+               (case algo
+                 (:loop
+                   (%join-loop result table
+                               (let ((gls
+                                       (subseq table-widths 0 (1+ i))))
+                                 (lambda (left right)
+                                   (apply condition right
+                                          (reverse-group-list
+                                           left gls))))
+                               :type type))
+                 (:hash
+                  (let ((eqs condition))
+                    (%join-hash result table
+                                (destructuring-bind (lf rf) eqs
+                                  (let ((gls
+                                          (subseq table-widths 0 (1+ i))))
+                                    (list
+                                     (lambda (&rest left-fields)
+                                       (apply lf
+                                              (reverse-group-list
+                                               left-fields gls)))
+                                     (lambda (&rest right-fields)
+                                       (funcall rf right-fields)))))
+                                :type type
+                                :test join-test))))))
+    result))
+
+(defun union (tables
+              &key
+                all-p
+                (test #'equal))
+  "Returns the union/union-all of the input tables using the test
+function to compare rows of data.  If all-p is T, then union-all is
+used rather than union (i.e. all rows are included)."
+  (let ((fns (field-names (first tables))))
+    (make-table
+     (if all-p
+         (apply #'append
+                (mapcar #'table->list tables))
+         (let ((result nil))
+           (dolist (x (apply #'append
+                             (mapcar #'table->list tables))
+                      (nreverse result))
+             (pushnew x result :test test))))
+     :field-names fns)))
