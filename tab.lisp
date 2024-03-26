@@ -76,6 +76,7 @@ from plists, alists, other tables, CSVs, SQL queries etc.")
            ;; list of plists
            (plistp (x)
              (and (lolp x)
+                  (caar x)
                   (symbolp (caar x)))))
     (let (table-data table-length table-width)
       (cond
@@ -129,7 +130,7 @@ from plists, alists, other tables, CSVs, SQL queries etc.")
                      :field-names (if field-names
                                       field-names
                                       (loop
-                                        for x from 1 to table-width
+                                        for x from 1 to (or table-width 0)
                                         collecting
                                         (format nil "x~a" x)))))))
 
@@ -343,7 +344,8 @@ the front of the columns list or the end.")
  structure).")
   (:method ((table table))
     (map nil (lambda (column) (adjust-array column 0 :fill-pointer t))
-         (data table))))
+         (data table))
+    table))
 
 ;;; Aggregations:
 ;;;
@@ -384,11 +386,11 @@ no state management, aka pure functions.  It may work in other cases
 on a case-by-case basis.
 
 Use this as a reference implementation for your own aggregation functions: They must accept a context, and then optional arguments for the accumulation and new datum."
-  (lambda (group)
+  (lambda (&optional group)
     (declare (ignore group))
     (let ((acc default-value))
       (lambda (&optional
-                 (datum nil datum-supplied-p))
+            (datum nil datum-supplied-p))
         (if datum-supplied-p
             (setf acc (funcall fn acc datum))
             acc)))))
@@ -423,7 +425,7 @@ aggregate.  See all aggregates via (apropos \"agg-\")")
 ;; Mean aggregation
 (defun agg-mean (&optional (type 'number))
   "Mean aggregation function.  See all aggregates via (apropos \"agg-\")"
-  (lambda (group)
+  (lambda (&optional group)
     (declare (ignore group))
     (let ((count (coerce 0 type))
           (sum (coerce 0 type)))
@@ -472,7 +474,9 @@ the resulting aggregate table."
      :field-names field-names)))
 
 ;;; Compound aggregation:
-(defmacro with-aggregation (group agg-bindings lambda-list agg-result
+(defmacro with-aggregation (group agg-bindings
+                            agg-result
+                            table-field-lambda-list
                             &body agg-body)
   "Macro that generates code to return a function that will create an
 aggregation function using aggregate functions that are provided in
@@ -481,16 +485,40 @@ agg-bindings.
 Each agg-binding must be of the form (fsym agg-form) where agg-form
 evaluates to an aggregate closure.  This function will be bound to
 fsym as a callable function, e.g. (fsym ...) will work correclty as
-will (funcall #'fsym ...).
+will (funcall #'fsym ...).  Simultaneously, for convenience, a
+symbol-macrolet for that same symbol (e.g. fsym) will be bound to a
+call to the closure with no arguments (e.g. (fsym)).  This allows the
+aggregation symbol to be used to access the value of the
+aggregation, e.g. in the agg-result.
+
+agg-result is a list of aggregate values to return per-group, and will
+be treated as rows in the resulting aggregate table.
+
+table-field-lambda-list can be a lambda list for the function that
+will receive all table fields as distinct arguments, or it can just be
+a list of symbols to be bound to those fields.  This is for
+convienence, as an implicit &optional will be added to the front of
+the lambda list.  Omitting the &optional was found to be a common
+mistake, hence this special behavior.
 
 This is useful for creating an aggregation to use with
 aggregate.
+
+If group is NIL, then the group argument will not be accessible nor
+used in the aggregation (assumes single-group and therefore reasonable
+group-fn, e.g. (constantly t)).
 
 The first forms in agg-body can be declarations for the generated
 aggregation function, i.e. they can declare things about the arguments
 in the lambda list but not about the group (might fix in future)."
   (alexandria:with-gensyms (args)
-    (let ((aggs (loop
+    (let ((group (or group (gensym "group")))
+          (table-field-lambda-list
+            (if (or (member '&rest table-field-lambda-list)
+                    (member '&optional table-field-lambda-list))
+                table-field-lambda-list
+                (cons '&optional table-field-lambda-list)))
+          (aggs (loop
                   for b in agg-bindings collecting (gensym (string (first b)))))
           (declarations
             (remove-if-not (lambda (form) (and (listp form) (eq (first form) 'declare)))
@@ -511,12 +539,17 @@ in the lambda list but not about the group (might fix in future)."
                         (declare (ignore form))
                         `(,fsym (&rest ,args)
                                 (apply ,a ,args))))
-             (lambda (&rest ,args)
-               (destructuring-bind ,lambda-list ,args
-                 ,@declarations
-                 (if ,args
-                     (progn ,@agg-body)
-                     ,agg-result)))))))))
+             (symbol-macrolet ,(loop
+                                 for b in agg-bindings
+                                 for fsym = (first b)
+                                 collecting
+                                 `(,fsym (,fsym)))
+               (lambda (&rest ,args)
+                 (destructuring-bind ,table-field-lambda-list ,args
+                   ,@declarations
+                   (if ,args
+                       (progn ,@agg-body)
+                       ,agg-result))))))))))
 
 ;;; Joins
 ;;;
@@ -626,9 +659,270 @@ and appended to the front of the boolean list."
               (incf index))))
       result)))
 
+;;; Attempt at join #2:
+;;;
+;;; This time, a compositional/functional approach is taken.
+;;;
+;;; (join table &rest join-lists)
+;;;
+;;; Each join-list is a list of the form (table on-fn) where on-fn is
+;;; a function that accepts two tables as input and returns a list of
+;;; row index lists.  The number of row index lists is the length of
+;;; the new joined table, and each row index list must have exactly 2
+;;; elements, each being either a row index from the corresponding
+;;; table or NIL denoting that this particular row only contains data
+;;; from one of the tables.
+;;;
+;;; Previously I had allowed a list of index lists to be suppiled to
+;;; denote a simple index-specified join, but to support a more
+;;; generally aesthetic syntax, I instead provide #'on-indices which
+;;; simply wraps a list of index lists in a function that is suitable
+;;; for #'join.
+
+;; (defun join (table &rest join-lists)
+;;   "Joins a table using the join-lists supplied.  Each join-list must be of the form
+
+;; (other-table on-fn &optional type)
+
+;; where other-table is a table to join, type is one of :inner (default),
+;; :left, :right, or :full, and on-fn is a function that accepts a list
+;; of rows from the tables involved in the join thus far, supplied in
+;; order from most recent to least (e.g. table[N] table[N-1] ... table)
+;; and returns a list of booleans specifying the rows to be included in
+;; the resulting table.  Each boolean list must be of length 2, and at
+;; most one of the elements may be NIL with the other being non-NIL.  If
+;; a boolean is NIL, this means that the data from the corresponding
+;; table should not be included in the joined table but the data from the
+;; other table should be included.  (This is necessary for outer joins.)
+
+;; For convience, use #'on to create on-fns from boolean condition
+;; functions."
+;;   (let* ((tables (list* table (mapcar #'car join-lists)))
+;;          (on-fns (mapcar #'cdr join-lists))
+;;          (widths (mapcar #'table-width tables))
+;;          (result nil))
+;;     (labels ((jn (t1 t2 on &optional (type :inner))
+;;                (
+;;   )
+
 ;; (defun on-keys (&rest tk->tks)
 ;;   "Returns a function that, when supplied with a list of tables as
 ;; inputs, will return the indices-lists for the columns that should be
 ;; present in the joined table.
 
 ;; Each tk->tks should have the following form"
+
+;; Starting from simple approach: Binary join functions
+(defun %join-loop (t1 t2 condition-fn
+                   &key (type :inner)
+                     field-names)
+  "Accepts
+
+* Tables t1 and t2.
+
+* Condition function which accepts a row from each table and returns T
+or NIL when a join of the rows should be accepted or rejected.
+
+* Type of join: :inner (default), :left, :right, or :full."
+  ;; I'm using a bit-vector to indicate which rows from the right
+  ;; table have been included in the result to support the case of the
+  ;; full join.  There might be other approaches that work better, but
+  ;; this is easy to write and not that bad memory wise.
+  (let* (;; right index vector:
+         ;; 1 if already included in result, 0 if not.
+         (ri (when (eq type :full)
+               (make-array (table-length t2)
+                           :element-type 'bit
+                           :initial-element 0)))
+         (field-names (or field-names
+                          (append (field-names t1)
+                                  (field-names t2))))
+         ;; results pushed into list instead of table for efficiency
+         (result nil)
+         (i2 0)
+         included-p)
+    ;; switching arguments for right join
+    (when (eq type :right)
+      (rotatef t1 t2))
+    (dotable (r1 t1)
+      (setf i2 0
+            included-p nil)
+      (dotable (r2 t2)
+        (let ((j (funcall condition-fn r1 r2)))
+          (when j
+            (push (append r1 r2) result)
+            (when (and (not (eq type :inner))
+                       (not included-p))
+              (setf included-p t))
+            (when (eq type :full)
+              (setf (elt ri i2) 1))))
+        (incf i2))
+      (when (and (not (eq type :inner))
+                 (not included-p))
+        (push (append r1 (loop repeat (table-width t2) collect nil))
+              result)))
+    ;; fixing data & tables for right join:
+    (when (eq type :right)
+      (setf result
+            (mapcar (lambda (fs)
+                      (append (subseq fs (table-width t1))
+                              (subseq fs 0 (table-width t1))))
+                    result))
+      (rotatef t1 t2))
+    ;; post-processing missing right rows for full join:
+    (when (eq type :full)
+      (dotimes (i (table-length t2))
+        (when (zerop (elt ri i))
+          (push (append (loop repeat (table-width t1) collect nil)
+                        (table-ref t2 i))
+                result))))
+    (make-table (nreverse result) :field-names field-names)))
+
+;; Binary hash equijoin function:
+(defun %join-hash (t1 t2 eqs
+                   &key
+                     (test 'equal)
+                     (type :inner)
+                     field-names)
+  "Uses hash tables to match rows using lists of keys on which to join
+the tables as specified in eqs.
+
+eqs should be a list of equivalence lists.  Each equivalence list should contain 2 elements:
+
+* A field name or index from t1.
+* A field name or index from t2.
+
+These pairs of field specifiers indicate an equivalence relationship
+between the fields specified, which in combination will be used to
+perform the join.
+
+test can be one of the supported tests for hash tables.
+
+type can be one of :inner (default), :left, :right, or :full."
+  (declare (optimize (debug 3)))
+  (let* (;; left index vector:
+         ;; 1 if already included in result, 0 if not.
+         (li (when (or (eq type :full)
+                       (eq type :left))
+               (make-array (table-length t1)
+                           :element-type 'bit
+                           :initial-element 0)))
+         ;; right index vector:
+         ;; 1 if already included in result, 0 if not.
+         (ri (when (or (eq type :full)
+                       (eq type :right))
+               (make-array (table-length t2)
+                           :element-type 'bit
+                           :initial-element 0)))
+         (field-names (or field-names
+                          (append (field-names t1)
+                                  (field-names t2))))
+         ;; results pushed into list instead of table for efficiency
+         (result nil)
+         (lmap (make-hash-table :test test))
+         (rmap (make-hash-table :test test))
+         (rfspecs (mapcar #'first eqs))
+         (lfspecs (mapcar #'second eqs))
+         (rfindices (sort (loop
+                            for f in rfspecs
+                            collecting
+                            (if (integerp f)
+                                f
+                                (position f
+                                          (field-names t1)
+                                          :test #'equal)))
+                          #'<))
+         (lfindices (sort (loop
+                            for f in lfspecs
+                            collecting
+                            (if (integerp f)
+                                f
+                                (position f
+                                          (field-names t1)
+                                          :test #'equal)))
+                          #'<)))
+    (labels (;; functions to grab keys for right and left tables
+             (getfields (row indices)
+               (do* ((r row (cdr r))
+                     (f (car r) (car r))
+                     (i 0 (1+ i))
+                     (result nil)
+                     (tail nil))
+                    ((or (null indices)
+                         (null r))
+                     result)
+                 (when (= i (car indices))
+                   (if result
+                       (setf (cdr tail) (cons f nil)
+                             tail (cdr tail))
+                       (setf result
+                             (setf tail (cons f nil))))
+                   (setf indices (cdr indices)))))
+             (rfields (row)
+               (getfields row rfindices))
+             (lfields (row)
+               (getfields row lfindices)))
+      ;; setup maps
+      (let ((i -1))
+        (dotable (r1 t1)
+          (push (incf i) (gethash (lfields r1) lmap))))
+      (let ((i -1))
+        (dotable (r2 t2)
+          (push (incf i) (gethash (rfields r2) rmap))))
+      ;; Push intersection results:
+      (loop
+        for k being the hash-keys in lmap
+        for lindices being the hash-values in lmap
+        do
+           (let ((rindices (gethash k rmap)))
+             ;; mark rows as being inserted
+             (when (and lindices rindices)
+               (map nil
+                    (lambda (indices)
+                      (map nil
+                           (lambda (i)
+                             (when (zerop (elt indices i))
+                               (setf (elt indices i) 1)))
+                           indices))
+                    (list li ri)))
+             ;; insert intersection rows
+             (when rindices
+               (let ((r1s (mapcar (lambda (i)
+                                    (table-ref t1 i))
+                                  lindices))
+                     (r2s (mapcar (lambda (i)
+                                    (table-ref t2 i))
+                                  rindices)))
+                 (dolist (r1 r1s)
+                   (dolist (r2 r2s)
+                     (push (append r1 r2)
+                           result)))))))
+      ;; Handle left/right/full non-intersections:
+      (labels ((lins ()
+                 (dotimes (i (length li))
+                   (let ((present (plusp (elt li i))))
+                     (unless present
+                       (push (append (table-ref t1 i)
+                                     (loop
+                                       repeat (table-width t2)
+                                       collect nil))
+                             result)))))
+               (rins ()
+                 (dotimes (i (length ri))
+                   (let ((present (plusp (elt ri i))))
+                     (unless present
+                       (push (append (loop
+                                       repeat (table-width t1)
+                                       collect nil)
+                                     (table-ref t2 i))
+                             result))))))
+        (case type
+          (:full (lins) (rins))
+          (:left (lins))
+          (:right (rins))))
+      ;; Return result:
+      (make-table (nreverse result)
+                  :field-names field-names))))
+
+;; Now provide nice front-end to the two previous binary join
+;; operations:

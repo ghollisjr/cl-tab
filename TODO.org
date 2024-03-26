@@ -5,7 +5,29 @@
 - [X] Table record insertion
 - [X] Table record deletion
 - [X] Table aggregations, including grouping
-- [ ] Table joins (full, left, right, inner) UPDATE: I've implemented
+- [ ] Table joins (full, left, right, inner)
+
+  UPDATE: To the end of a single join function as described in part
+  below, I have defined %join-loop and %join-hash which implement
+  binary hash and loop joins, respectively.  Both support all types of
+  joins (inner, left, right, full), so the last piece of the join
+  library is a unified front end to these joins which will allow
+  different "on" specifications to determine the specific type of join
+  to use between two tables.  The basic on-forms I intend to support
+  are
+
+  - (on tab2 fn &key (type :inner))
+  - (on tab2 eqs &key (type :inner) (test 'equal))
+
+  In this case, I intend to have an #'on function which simply makes
+  sure that the arguments are interpreted in the correct way for the
+  join function.  I may actually implement an on class with different
+  subtypes, but this is probably not necessary.  A single #'on
+  function could simply return the proper information for the join
+  function, or the on function could be completely unnecessary and I
+  may drop it in favor of lists with specific formatting.
+  
+  UPDATE: I've implemented
   a version of table-join and #'on that work well for inner joins, but
   I want a different style of join for this library.  The calling
   protocol should look something like this:
@@ -42,6 +64,27 @@
   join of those tables with the condition applied.  Supporting left,
   right, and full joins should be much simpler when the operations are
   always binary and left-associative.
+
+  UPDATE: More ideas.
+
+  - Let the join-list on element be a function or a list of key joins.
+    MS-SQL calls joining on equivalence "equijoins", so I might adopt
+    the same terminology and call them equijoins as well.  MS-SQL uses
+    merge joins or hash joins.  I'm considering only going with
+    hash-table joins for now, so that each equijoin could specify
+    equivalence relationships via lists of the form
+
+    (op field field)
+
+    where op is one of 'eq, 'eql, 'equal, or 'equalp, and each
+    field is one of
+
+    1. Field name.
+    2. (table name-or-index)
+
+    This would use #'eq to check the table in each (table
+    name-or-index) list to see where it occurred in the join so that
+    the join function can appropriately find the values to equate.
 - [ ] Table unions
 - [X] Table CSV I/O
 - [ ] Table SQL I/O
