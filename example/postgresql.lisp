@@ -3,7 +3,7 @@
 
 (defun example-psql ()
   "Read table from PostgreSQL"
-  (clsql:connect '("localhost" "test" "test" "password")
+  (clsql:connect '("localhost" "some_database" "user" "password")
                  :database-type :postgresql)
   ;; get table content:
   (query "select * from some_table;"))
