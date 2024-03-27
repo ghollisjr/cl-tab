@@ -5,11 +5,11 @@
 (defun query (query-expression
               &key
                 (database clsql-sys:*default-database*)
-                (results-p t))
+                (result-p t))
   "Front-end to clsql's query and execute-command functions that returns
-a table of results when results-p is non-NIL, and nothing when
-results-p is NIL."
-  (if results-p
+a table of results when result-p is non-NIL, and nothing when
+result-p is NIL."
+  (if result-p
       (multiple-value-bind (results columns)
           (clsql:query query-expression
                        :database database)
