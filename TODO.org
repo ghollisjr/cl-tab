@@ -1,11 +1,24 @@
-* TODO [7/14] Lisp library
+* TODO [10/14] Lisp library
 - [X] Table data type
 - [X] Table mapping
 - [X] Table iteration (dotable)
 - [X] Table record insertion
 - [X] Table record deletion
 - [X] Table aggregations, including grouping
-- [ ] Table joins (full, left, right, inner)
+- [X] Table joins (full, left, right, inner)
+
+  UPDATE: The join system is fully operational, although there was a
+  change to the handling of equijoins, namely: Instead of lists of
+  field specifiers, a list of two functions, call them left and right,
+  are supplied such that left accepts the rows of previously joined
+  tables in reverse order of join, and right accepts a row from the
+  new table being joined.  This is sufficient to support any kind of
+  equijoin on fields as well as equijoins on functions of fields,
+  which is desirable often enough in my opinion that the special
+  semantics to support plain fields was not justifiable.  Some of the
+  lower level functions already supported this and have not been
+  updated to remove that functionality, but such behavior is
+  deprecated.
 
   UPDATE: To the end of a single join function as described in part
   below, I have defined %join-loop and %join-hash which implement
@@ -85,9 +98,17 @@
     This would use #'eq to check the table in each (table
     name-or-index) list to see where it occurred in the join so that
     the join function can appropriately find the values to equate.
-- [ ] Table unions
+- [X] Table unions
+
+   UPDATE: #'union shadows cl:union and provides support for SQL's
+  "union" and "union all" statements.
 - [X] Table CSV I/O
-- [ ] Table SQL I/O
+- [X] Table SQL I/O
+
+  UPDATE: Fully functional.  Some additional tools for e.g. SQL->CSV
+  are desirable but not yet implemented, although it is trivial to
+  compose #'query and #'table->CSV to this end.
+  
   UPDATE: Partially complete, tb:query can yield table from clsql
   output.
 - [ ] cl-ana generic math integration
