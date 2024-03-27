@@ -3,13 +3,22 @@
 (in-package :tb)
 
 (defun query (query-expression
-              &key (database clsql-sys:*default-database*))
-  (multiple-value-bind (results columns)
-      (clsql:query query-expression
-                   :database database)
-    (make-table results :field-names columns)))
+              &key
+                (database clsql-sys:*default-database*)
+                (results-p t))
+  "Front-end to clsql's query and execute-command functions that returns
+a table of results when results-p is non-NIL, and nothing when
+results-p is NIL."
+  (if results-p
+      (multiple-value-bind (results columns)
+          (clsql:query query-expression
+                       :database database)
+        (make-table results :field-names columns))
+      (clsql:execute-command query-expression
+                             :database database)))
 
 (defun sql-type (obj)
+  "Infer SQL type from object"
   (typecase obj
     (character "CHAR")
     (string "VARCHAR(65535)")
@@ -19,29 +28,41 @@
     ;; default to strings
     (t "VARCHAR(65535)")))
 
-(defun sql-convert (obj)
-  (typecase obj
-    (character (format nil "'~a'" obj))
-    (string (format nil "'~a'" obj))
-    (null "null")
-    (symbol (format nil "'~a'" obj))
-    (integer (format nil "~a" obj))
-    (float (format nil "~f" obj))
-    (t (format nil "'~a'" obj))))
-
 (defun table-sql-types (table)
-  "Tries to infer SQL types from table"
+  "Infer SQL types from table"
   (mapcar (lambda (d)
             (sql-type (aref d 0)))
           (data table)))
 
+(defun sql-convert (obj)
+  "Convert object to string suitable for SQL queries"
+  (symbol-macrolet ((s (clsql-sys:sql-escape-quotes
+                        (format nil "~a" obj))))
+    (typecase obj
+      (character (format nil "'~a'" s))
+      (string (format nil "'~a'" s))
+      (null "null")
+      (symbol (format nil "'~a'" s))
+      (integer (format nil "~a" obj))
+      (float (format nil "~f" obj))
+      (t (format nil "'~a'" s)))))
+
 (defgeneric table->sql (table name
                         &key
+                          execute-p
+                          database
                           db-type
                           types
                           batch-size
                         &allow-other-keys)
   (:documentation "Generates a list of SQL queries to create the table and insert data.
+If execute-p is non-NIL (default), executes those queries on the
+database specified.
+
+* execute-p: Boolean controlling whether statements should be executed
+  or only returned as a list of query strings.
+
+* database: Database used for the queries.
 
 * db-type (CURRENTLY UNUSED) controls type of db server,
   e.g. :postgresql.
@@ -51,32 +72,45 @@
 
 * batch-size controls the number of rows to attempt to insert in a
   single insert statement.")
-  (:method ((table table) name &key db-type types (batch-size 1) &allow-other-keys )
+  (:method ((table table) name
+            &key
+              (execute-p t)
+              (database clsql:*default-database*)
+              db-type
+              types
+              (batch-size 1)
+            &allow-other-keys )
     (declare (ignore db-type))
-    (let ((types (or types (table-sql-types table))))
-      (list* (format nil
-                     "create table ~a (~{~a ~a~^, ~});"
-                     name
-                     (apply #'append
-                            (mapcar #'list
-                                    (field-names table)
-                                    types)))
-             (let ((nbatches (ceiling (table-length table)
-                                      batch-size)))
-               (loop
-                 for i below nbatches
-                 collect
-                 (let* ((batch
-                          (loop
-                            for j from (* i batch-size)
-                              below (min (table-length table)
-                                         (* (1+ i) batch-size))
-                            collect (table-ref table j)))
-                        (vstrings
-                          (mapcar (lambda (row)
-                                    (format nil "(~{~a~^, ~})"
-                                            row))
-                                  batch)))
-                   (format nil "insert into ~a values ~{~a~^, ~};"
-                           name
-                           vstrings))))))))
+    (let* ((types (or types (table-sql-types table)))
+           (queries
+             (list* (format nil
+                            "create table ~a (~{~a ~a~^, ~});"
+                            name
+                            (apply #'append
+                                   (mapcar #'list
+                                           (field-names table)
+                                           types)))
+                    (let ((nbatches (ceiling (table-length table)
+                                             batch-size)))
+                      (loop
+                        for i below nbatches
+                        collect
+                        (let* ((batch
+                                 (loop
+                                   for j from (* i batch-size)
+                                     below (min (table-length table)
+                                                (* (1+ i) batch-size))
+                                   collect (table-ref table j)))
+                               (vstrings
+                                 (mapcar (lambda (row)
+                                           (format nil "(~{~a~^, ~})"
+                                                   (mapcar #'sql-convert row)))
+                                         batch)))
+                          (format nil "insert into ~a values ~{~a~^, ~};"
+                                  name
+                                  vstrings)))))))
+      (if execute-p
+          (map nil
+               (lambda (q) (clsql:execute-command q :database database))
+               queries)
+          queries))))
