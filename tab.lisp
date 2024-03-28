@@ -143,7 +143,22 @@ type controls type of sequence.")
     (map type
          (lambda (column)
            (aref column index))
-         (data table))))
+         (data table)))
+  (:method ((table table) (index string)
+            &key
+              (type 'list)
+              (test #'equal))
+    (let ((index (position index (field-names table) :test test)))
+      (when index
+        (coerce (elt (data table) index) type))))
+  (:method ((table table) (index list)
+            &key
+              (type 'list)
+              (test #'equal))
+    (when index
+      (map type
+           (lambda (f) (table-ref table f :test test))
+           index))))
 
 ;;; Table mapping:
 (defun table-map (row-fn table
