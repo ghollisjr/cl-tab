@@ -2,10 +2,14 @@
 ;;;; and return the results as a table.
 (in-package :tb)
 
-(defun query (query-expression
-              &key
-                (database clsql-sys:*default-database*)
-                (result-p t))
+(defgeneric query (expr &key database result-p &allow-other-keys)
+  (:documentation "Runs query or queries based on expr using database and returning result depending on result-p"))
+
+(defmethod query ((query-expression string)
+                  &key
+                    (database clsql-sys:*default-database*)
+                    (result-p t)
+                    &allow-other-keys)
   "Front-end to clsql's query and execute-command functions that returns
 a table of results when result-p is non-NIL, and nothing when
 result-p is NIL."
@@ -16,6 +20,17 @@ result-p is NIL."
         (make-table results :field-names columns))
       (clsql:execute-command query-expression
                              :database database)))
+
+(defmethod query ((q list)
+                  &key
+                    (database clsql-sys:*default-database*)
+                    (result-p t)
+                  &allow-other-keys)
+  (if result-p
+      (mapcar (lambda (s) (query s :database database :result-p result-p))
+              q)
+      (map nil (lambda (s) (query s :database database :result-p result-p))
+           q)))
 
 (defun sql-type (obj)
   "Infer SQL type from object"
