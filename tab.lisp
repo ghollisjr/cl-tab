@@ -136,18 +136,7 @@ from plists, alists, other tables, CSVs, SQL queries etc.")
                    (lambda (v a)
                      (setf (aref a i)
                            v))
-                   list table-data))
-         ;; (let ((transpose
-         ;;         (cl-ana.list-utils:transpose data)))
-         ;;   (loop
-         ;;     for col in transpose
-         ;;     for dest in table-data
-         ;;     do
-         ;;        (loop
-         ;;          for i below table-length
-         ;;          for c in col
-         ;;          do (setf (aref dest i) c))))
-         )
+                   list table-data)))
         ;; default case: empty table, no columns, no names
         (t nil))
       (make-instance 'table
