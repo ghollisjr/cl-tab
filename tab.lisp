@@ -1,3 +1,5 @@
+(declaim (optimize (speed 3)))
+
 (in-package :tb)
 
 (defclass table ()
@@ -9,11 +11,23 @@
                 :documentation "list of table field names"
                 :accessor field-names
                 :type list)
+   (field-map :initarg :field-map
+              :initform (make-hash-table :test #'equal)
+              :documentation "hash table mapping from field name to column index"
+              :accessor field-map
+              :type hash-table)
    (indices :initform nil
             :initarg :indices
             :documentation "alist of table indexes"
             :accessor table-indices
             :type list)))
+
+(defmethod initialize-instance :after ((tab table) &rest init-args)
+  (declare (ignorable init-args))
+  (loop
+    for f in (field-names tab)
+    for i from 0
+    do (setf (gethash f (field-map tab)) i)))
 
 (defgeneric table-length (table)
   (:documentation "Returns number of rows of table")
@@ -68,7 +82,7 @@ from plists, alists, other tables, CSVs, SQL queries etc.")
 (defmethod make-table ((data list)
                        &key
                          field-names)
-  (declare (optimize (debug 3)))
+  (declare (list field-names))
   (labels (;; list-of-lists-p
            (lolp (x)
              (and (car x)
@@ -122,7 +136,18 @@ from plists, alists, other tables, CSVs, SQL queries etc.")
                    (lambda (v a)
                      (setf (aref a i)
                            v))
-                   list table-data)))
+                   list table-data))
+         ;; (let ((transpose
+         ;;         (cl-ana.list-utils:transpose data)))
+         ;;   (loop
+         ;;     for col in transpose
+         ;;     for dest in table-data
+         ;;     do
+         ;;        (loop
+         ;;          for i below table-length
+         ;;          for c in col
+         ;;          do (setf (aref dest i) c))))
+         )
         ;; default case: empty table, no columns, no names
         (t nil))
       (make-instance 'table
@@ -146,9 +171,8 @@ type controls type of sequence.")
          (data table)))
   (:method ((table table) (index string)
             &key
-              (type 'list)
-              (test #'equal))
-    (let ((index (position index (field-names table) :test test)))
+              (type 'list))
+    (let ((index (gethash index (field-map table))))
       (when index
         (coerce (elt (data table) index) type))))
   (:method ((table table) (index list)
@@ -218,8 +242,11 @@ yields field/column.  For list, result is a list of field-lists."
 (defun table->plist (table)
   (table-map #'list table :type 'plist))
 
-(defun table->list (table)
-  (table-map #'list table :type 'list))
+(defun table->list (table &optional flat-p)
+  (let ((r (table-map #'list table :type 'list)))
+    (if flat-p
+        (apply #'append r)
+        r)))
 
 (defun table->array (table)
   (table-map #'list table :type 'array))
@@ -306,7 +333,6 @@ the front of the columns list or the end.")
   ;;
   ;; :sorted-p t -> no need to sort indices
   (:method ((table table) (condition list) &key sorted-p &allow-other-keys)
-    (declare (optimize (debug 3)))
     (with-accessors ((data data))
         table
       (let ((table-length (table-length table))
@@ -670,7 +696,6 @@ perform the join.
 test can be one of the supported tests for hash tables.
 
 type can be one of :inner (default), :left, :right, or :full."
-  (declare (optimize (debug 3)))
   (let* (;; left index vector:
          ;; 1 if already included in result, 0 if not.
          (li (when (or (eq type :full)
@@ -703,7 +728,7 @@ type can be one of :inner (default), :left, :right, or :full."
                                 (if (integerp f)
                                     f
                                     (position f
-                                              (field-names t1)
+                                              (the list (field-names t1))
                                               :test #'equal)))
                               #'<)))
            (rfindices (when req-p
@@ -713,7 +738,7 @@ type can be one of :inner (default), :left, :right, or :full."
                                 (if (integerp f)
                                     f
                                     (position f
-                                              (field-names t1)
+                                              (the list (field-names t1))
                                               :test #'equal)))
                               #'<))))
       (labels (;; functions to grab keys for right and left tables
@@ -726,7 +751,8 @@ type can be one of :inner (default), :left, :right, or :full."
                       ((or (null indices)
                            (null r))
                        result)
-                   (when (= i (car indices))
+                   (declare (fixnum i))
+                   (when (= i (the fixnum (car indices)))
                      (if result
                          (setf (cdr tail) (cons f nil)
                                tail (cdr tail))
@@ -745,9 +771,11 @@ type can be one of :inner (default), :left, :right, or :full."
                          (lambda (x) (apply (second eqs) x)))))
           ;; setup maps
           (let ((i -1))
+            (declare (fixnum i))
             (dotable (r1 t1)
               (push (incf i) (gethash (funcall lkey r1) lmap))))
           (let ((i -1))
+            (declare (fixnum i))
             (dotable (r2 t2)
               (push (incf i) (gethash (funcall rkey r2) rmap)))))
         ;; Push intersection results:
@@ -758,14 +786,18 @@ type can be one of :inner (default), :left, :right, or :full."
              (let ((rindices (gethash k rmap)))
                ;; mark rows as being inserted
                (when (and lindices rindices)
-                 (map nil
-                      (lambda (indices)
-                        (map nil
-                             (lambda (i)
-                               (when (zerop (elt indices i))
-                                 (setf (elt indices i) 1)))
-                             indices))
-                      (list li ri)))
+                 (when li
+                   (map nil
+                        (lambda (i)
+                          (when (zerop (elt li i))
+                            (setf (elt li i) 1)))
+                        lindices))
+                 (when ri
+                   (map nil
+                        (lambda (i)
+                          (when (zerop (elt ri i))
+                            (setf (elt ri i) 1)))
+                        rindices)))
                ;; insert intersection rows
                (when rindices
                  (let ((r1s (mapcar (lambda (i)
@@ -863,11 +895,11 @@ condition (inefficient, uses nested loop):
   tables in the join.  This was chosen to make it convenient to ignore
   arguments for tables that are unlikely to be involved in future
   joins."
-  (declare (optimize (debug 3)))
   (let* ((result table)
-         (tables (cons table
-                       (mapcar #'second joins)))
-         (table-widths (mapcar #'table-width tables)))
+         (table-widths
+           (mapcar #'table-width
+                   (cons table
+                         (mapcar #'second joins)))))
     (loop
       for join in joins
       for i from 0
@@ -876,7 +908,6 @@ condition (inefficient, uses nested loop):
       for condition = (third join)
       for type = (fourth join) ; e.g. :inner
       for join-test = (fifth join)
-      for traversed = (list result) then (append traversed (list table))
       do
          (setf result
                (case algo
@@ -885,7 +916,8 @@ condition (inefficient, uses nested loop):
                                (let ((gls
                                        (subseq table-widths 0 (1+ i))))
                                  (lambda (left right)
-                                   (apply condition right
+                                   (apply (the function condition)
+                                          right
                                           (reverse-group-list
                                            left gls))))
                                :type type))
@@ -913,14 +945,18 @@ condition (inefficient, uses nested loop):
   "Returns the union/union-all of the input tables using the test
 function to compare rows of data.  If all-p is T, then union-all is
 used rather than union (i.e. all rows are included)."
-  (let ((fns (field-names (first tables))))
+  (let* ((tables (remove nil tables))
+         (fns (when tables
+                (field-names (first tables)))))
     (make-table
      (if all-p
          (apply #'append
-                (mapcar #'table->list tables))
+                (mapcar #'table->list
+                        tables))
          (let ((result nil))
            (dolist (x (apply #'append
-                             (mapcar #'table->list tables))
+                             (mapcar #'table->list
+                                     tables))
                       (nreverse result))
              (pushnew x result :test test))))
      :field-names fns)))
