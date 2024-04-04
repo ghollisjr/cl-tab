@@ -4,7 +4,7 @@
    :cl)
   (:shadow :union)
   (:export
-   :key-join
+   :table
    :make-table
    :data
    :table-ref
@@ -12,6 +12,7 @@
    :table-width
    :field-names
    :table-map
+   :filter
    :table->list
    :table->plist
    :table->array
@@ -29,6 +30,7 @@
    :agg-count
    :agg-log-sum
    :agg-mean
+   :with-aggregation
    :tlet
    ;; CSV
    :write-csv
