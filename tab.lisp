@@ -186,7 +186,8 @@ values.
 type can be one of 'table, 'array, 'list, or 'plist to yield
 difference result types.  For array, first index yields row, second
 yields field/column.  For list, result is a list of field-lists."
-  (let ((length (table-length table)))
+  (let ((length (table-length table))
+        (field-names (or field-names (field-names table))))
     (case type
       (table
        (make-table
@@ -581,6 +582,21 @@ in the lambda list but not about the group (might fix in future)."
                        (progn ,@agg-body)
                        ,agg-result))))))))))
 
+;;; Filters
+;;;
+;;; I thought about using #'where to be more like SQL, but #'filter
+;;; suits my taste better.
+(defgeneric filter (function table &key &allow-other-keys)
+  (:documentation "Filters a table using boolean-valued function applied to each row
+which receives fields as distinct arguments.")
+  (:method (fn (tab table) &key &allow-other-keys)
+    (make-table
+     (remove-if-not (lambda (row)
+                      (apply fn row))
+                    (table->list tab))
+     :field-names (field-names tab))))
+
+
 ;;; Joins
 ;;;
 ;;; Joins are a place where some real benefits can be had through
@@ -949,3 +965,23 @@ used rather than union (i.e. all rows are included)."
                       (nreverse result))
              (pushnew x result :test test))))
      :field-names fns)))
+
+(defun distinct (table &key
+                         (row-fn #'list)
+                         (test 'equal))
+  "Uses a hash-table to ensure that each row of the table is distinct
+according to the values of row-fn applied to each row and using the
+supplied hash test parameter."
+  (let ((ht (make-hash-table :test test))
+        (rows nil))
+    (dotimes (i (table-length table))
+      (let* ((row (table-ref table i))
+             (key (apply row-fn row)))
+        (unless (gethash key ht)
+          (setf (gethash key ht) t)
+          (push i rows))))
+    (make-table
+     (loop
+       for i in (nreverse rows)
+       collect (table-ref table i))
+     :field-names (field-names table))))
