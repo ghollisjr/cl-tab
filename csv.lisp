@@ -138,3 +138,17 @@ behavior."
                      read-field-names)
                     (field-names field-names)
                     ((null field-names) nil))))))
+
+;; cl-ana.makeres methods for saving tables as CSVs in project
+(defmethod cl-ana.makeres:save-object ((tab table) path)
+  ;; Write opener form to file:
+  (with-open-file (file path
+                        :direction :output
+                        :if-does-not-exist :create
+                        :if-exists :supersede)
+    (write-csv tab :stream file)))
+
+(defmethod cl-ana.makeres:load-object ((type (eql 'table)) path)
+  (with-open-file (file path
+                        :direction :input)
+    (read-csv file)))
