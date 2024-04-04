@@ -52,10 +52,9 @@ clobber earlier fields."
                                      ".")))
                   "")
               prefix)))
-    (alexandria:with-gensyms (r tab ucp sym x val pre)
+    (alexandria:with-gensyms (r tab sym x val pre)
       `(let ((,r ,row)
              (,tab ,table)
-             (,ucp ,upcase-p)
              (,pre (string ',prefix)))
          (loop
            for ,sym in (mapcar (lambda (,x)
