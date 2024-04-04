@@ -22,8 +22,9 @@
    :insert!
    :delete!
    :join
-   :union
    :on
+   :union
+   :distinct
    :aggregate
    :agg
    :agg-sum
