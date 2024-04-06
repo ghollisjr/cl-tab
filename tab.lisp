@@ -801,7 +801,10 @@ or NIL when a join of the rows should be accepted or rejected.
              do
                 (let ((j (apply condition-fn (append r1 r2))))
                   (when j
-                    (push (append r1 r2) result)
+                    (push (if (eq type :right)
+                              (append r2 r1)
+                              (append r1 r2))
+                          result)
                     (when (and (not (eq type :inner))
                                (not included-p))
                       (setf included-p t))
