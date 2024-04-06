@@ -1,3 +1,32 @@
+* TODO [12/13] plist api conversion
+All table functions should use plists for table row I/O, passing these
+to functions and expecting them by default, with the exceptional case
+being lists of plain data and explicitly specified field names.
+
+In addition, to ease use, a control parameter *field-case-convert*
+should be provided which allows three states:
+
+- NIL:     preserve all field name case
+- T:       Up-case all field names
+- :invert: Change field names to all-upper before intern, then
+           all-lower as a field name string
+
+- [X] Create *field-case-convert*
+
+Function plist conversions:
+- [X] make-table
+- [X] table-map
+- [X] table-ref
+- [X] insert!
+- [X] delete!
+- [X] aggregate
+- [X] join
+- [X] %join-loop
+- [X] %join-hash
+- [X] filter
+- [ ] Deprecate tlet
+- [X] Implement tlambda
+
 * TODO [10/14] Lisp library
 - [X] Table data type
 - [X] Table mapping

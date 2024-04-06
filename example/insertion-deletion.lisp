@@ -11,6 +11,17 @@
              (list "more data" 4))
     table))
 
+(defun insertion-example2 ()
+  (let ((table (make-table '(("hello" 1)
+                             ("world" 2))
+                           :field-names
+                           '("message" "index"))))
+    (insert! table
+             ;; also can use plists
+             (list :|message| "this is" :|index| 3)
+             (list :|message| "more data" :|index| 4))
+    table))
+
 (defun deletion-example ()
   (let ((table (make-table '(("hello"     1)
                              ("world"     2)
@@ -25,5 +36,5 @@
     (delete! table (list 2 3)) ; -> last 2 rows gone
     ;; or using a boolean function
     (delete! table
-             (lambda (message index)
-               (> index 2))))) ; -> only ("hello" 1) remaining
+             (tlambda (|message| |index|)
+               (> |index| 2))))) ; -> only ("hello" 1) remaining

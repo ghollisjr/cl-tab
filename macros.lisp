@@ -68,3 +68,33 @@ clobber earlier fields."
            do
               (setf (symbol-value ,sym) ,val))
          ,@body))))
+
+(defmacro tlambda ((&rest fields) &body body)
+  "Generates a new lambda function which effectively transforms fields
+into a lambda list of the form `(&key ,@fields &allow-other-keys) so
+that any plist input can be parsed, and the fields that are desired by
+the user are automatically assigned to a specific symbol.
+
+Also provided in the body of the tlambda are macros and symbol macros
+as follows:
+
+* macro (field <string-or-keyword>): Returns field value from
+  row.
+
+* symbol-macro fields: Returns all fields in row as a plist.
+
+fields is setf-able so that if desired, one can simply modify the
+fields in a row and then return some function of that modified row.
+Useful for simply changing values, adding/removing columns etc."
+  (alexandria:with-gensyms (row)
+    `(lambda (&rest ,row)
+       (destructuring-bind (&key ,@fields &allow-other-keys) ,row
+         (symbol-macrolet ((fields ,row))
+           (macrolet ((field (spec)
+                        (typecase spec
+                          (symbol `(getf fields ,(intern (string spec)
+                                                         :keyword)))
+                          (keyword `(getf fields ,spec))
+                          (string `(getf fields
+                                         ,(intern spec :keyword))))))
+             ,@body))))))

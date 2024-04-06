@@ -12,18 +12,11 @@
                           (3 4))
                         :field-names '("e" "f"))))
     (join t1
-          (on t2 (lambda (r2 r1)
-                   (and (elt r1 1)
-                        (elt r2 0)
-                        (< (elt r1 1)
-                           (elt r2 0))))
+          (on t2 (tlambda (b c)
+                   (and b c (< b c)))
               :type :left)
-          (on t3 (lambda (r3 r2 &rest rest)
-                   (declare (ignore rest))
-                   (and  (elt r3 0)
-                         (elt r2 0)
-                         (= (elt r3 0)
-                            (elt r2 0))))
+          (on t3 (tlambda (c e)
+                   (and c e (= c e)))
               :type :left))))
 
 (defun example-join2 ()
@@ -39,23 +32,13 @@
     (join t1
           (on t2
               ;; equijoin on t1.b = t2.d
-              (list (lambda (r1)
-                      ;; useful macro to bind fields in a familiar
-                      ;; way:
-                      (tlet (r1 t1)
-                        t1.b))
-                    (lambda (r2)
-                      (tlet (r2 t2)
-                        t2.d)))
+              (list (tlambda (b) b)
+                    (tlambda (d) d))
               :type :left)
           (on t3
               ;; equijoin on t2.c = t3.e
-              (list (lambda (r2 r1)
-                      (tlet (r2 t2)
-                        t2.c))
-                    (lambda (r3)
-                      (tlet (r3 t3)
-                        t3.e)))
+              (list (tlambda (c) c)
+                    (tlambda (e) e))
               :type :full))))
 
 (defun example-join3 ()
@@ -78,3 +61,20 @@
                       (tlet (r2 t2)
                         (list t2.c t2.d))))
               :type :left))))
+
+(defun loop-join-test ()
+  (join (make-table '((1 2) (3 4)) :field-names '("X" "Y"))
+        (on (make-table '((1 1) (2 2)) :field-names '("Y" "Z"))
+            ;; note: for loop-join, field names are pre-converted, so
+            ;; you accept field names as they are in the joined table.
+            (tlambda (x .y)
+              (equal x .y)))))
+
+(defun hash-join-test ()
+  (join (make-table '((1 2) (3 4)) :field-names '("X" "Y"))
+        (on (make-table '((1 1) (2 2)) :field-names '("Y" "Z"))
+            (list (tlambda (x) x)
+                  ;; note: for hash-join, field names are not
+                  ;; pre-converted, so you accept the field names as
+                  ;; they are in the left and right tables pre-join.
+                  (tlambda (y) y)))))

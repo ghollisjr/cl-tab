@@ -4,14 +4,21 @@
    :cl)
   (:shadow :union)
   (:export
+   ;; control parameters
+   :*field-case-convert*
+   ;; tables
    :table
    :make-table
    :data
    :table-ref
+   :tref ; short-hand for table-ref
    :table-length
+   :tlength ; short-hand for table-length
    :table-width
+   :twidth ; short-hand for table-width
    :field-names
    :table-map
+   :tmap ; shorthand for table-map
    :filter
    :table->list
    :table->plist
@@ -37,4 +44,7 @@
    :write-csv
    :read-csv
    ;; SQL
-   :query))
+   :query
+   ;; misc
+   :plist
+   ))

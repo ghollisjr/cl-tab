@@ -2,6 +2,15 @@
 
 (in-package :tb)
 
+;;;; Control Parameters
+(defparameter *field-name-case-convert*
+  nil
+  "Controls how field names are converted to-from symbols.
+
+* NIL      Leave case untouched.  Can lead to ugly symbols.
+* T        Up-case all field names.  Bad for preserving field names.
+* :invert  All field name strings are down-cased, all symbols up-cased")
+
 (defclass table ()
   ((data :initarg :data
          :documentation "table data list of column arrays"
@@ -11,6 +20,10 @@
                 :documentation "list of table field names"
                 :accessor field-names
                 :type list)
+   (field-keywords :initarg :field-keywords
+                   :documentation "list of table field name keyword symbols"
+                   :accessor field-keywords
+                   :type list)
    (field-map :initarg :field-map
               :initform (make-hash-table :test #'equal)
               :documentation "hash table mapping from field name to column index"
@@ -22,8 +35,53 @@
             :accessor table-indices
             :type list)))
 
+;;; Proper field names:
+;;;
+;;; Proper field names are a list of field names so that every name is
+;;; unique and obeys the case convention set by
+;;; *field-name-case-convert*.
+(defun proper-field-names (field-names &optional (test #'equal))
+  "Accepts a list of field names and modifies them to ensure that each
+field is unique and adheres to the standard set by
+*field-name-case-convert*.
+
+Any field name that collides with a previous field name will have a
+#\. character prepended, repeating until it no longer collides with
+any other field names."
+  (let ((result (make-array (length field-names)
+                            :initial-contents field-names)))
+    (flet ((collides-p (n &optional (end 0))
+             (find n result :test test :end end)))
+      (loop
+        for n in field-names
+        for i from 0
+        do
+           (case *field-name-case-convert*
+             ((T) (setf n (string-upcase n)))
+             (:invert (setf n (string-downcase n))))
+           (loop while (collides-p n i)
+                 do (setf n (concatenate 'string "." n)))
+           (setf (aref result i) n)
+        finally (return (coerce result 'list))))))
+
+(defun field-names->keywords (proper-field-names)
+  "Returns a list of keyword symbols from proper-field-names using the
+convention set by *field-name-case-convert*"
+  (mapcar (lambda (s)
+            (case *field-name-case-convert*
+              (:invert (intern (string-upcase s) :keyword))
+              (t (intern s :keyword))))
+          proper-field-names))
+
 (defmethod initialize-instance :after ((tab table) &rest init-args)
   (declare (ignorable init-args))
+  ;; First fix field names
+  (setf (field-names tab)
+        (proper-field-names (field-names tab)))
+  ;; Then set field symbols:
+  (setf (field-keywords tab)
+        (field-names->keywords (field-names tab)))
+  ;; Establish name->index map
   (loop
     for f in (field-names tab)
     for i from 0
@@ -33,11 +91,15 @@
   (:documentation "Returns number of rows of table")
   (:method ((table table))
     (length (first (data table)))))
+(setf (symbol-function 'tlength)
+      #'table-length)
 
 (defgeneric table-width (table)
   (:documentation "Returns number of fields/columns of table")
   (:method ((table table))
     (length (data table))))
+(setf (symbol-function 'twidth)
+      #'table-width)
 
 (defgeneric make-table (data &key field-names &allow-other-keys)
   (:documentation
@@ -153,11 +215,19 @@ from plists, alists, other tables, CSVs, SQL queries etc.")
   (:documentation "Return a row from the table as a sequence of data.
 type controls type of sequence.")
   (:method ((table table) (index integer)
-            &key (type 'list))
-    (map type
-         (lambda (column)
-           (aref column index))
-         (data table)))
+            &key (type 'plist))
+    (case type
+      (plist
+       (mapcan (lambda (k v)
+                 (list k v))
+               (field-keywords table)
+               (mapcar (lambda (column) (aref column index))
+                       (data table))))
+      (t
+       (map type
+            (lambda (column)
+              (aref column index))
+            (data table)))))
   (:method ((table table) (index string)
             &key
               (type 'list))
@@ -166,67 +236,114 @@ type controls type of sequence.")
         (coerce (elt (data table) index) type))))
   (:method ((table table) (index list)
             &key
-              (type 'list)
+              (type 'plist)
               (test #'equal))
     (when index
-      (map type
-           (lambda (f) (table-ref table f :test test))
-           index))))
+      (mapcar
+       (lambda (f) (table-ref table f :test test :type type))
+       index))))
+(setf (symbol-function 'tref) #'table-ref)
 
 ;;; Table mapping:
 (defun table-map (row-fn table
                   &key
                     (type 'table)
-                    field-names)
+                    (field-names nil field-names-supplied-p))
   "Maps a function row-fn across table, supplying each field as a
-distinct argument to row-fn, and returning a new table with fields
-specified by field-names.  row-fn should return a list of new field
-values.
+distinct keyword argument to row-fn using the field-keywords from
+table, and returning a new table with fields specified either by the
+keyword symbols in the result list or explicitly by field-names.
+row-fn should return a list of new field values as a plist, or as a
+list of field values if field-names is supplied.  (Not supplying
+field-names but only supplying a list of results will result in
+default field names being supplied, e.g. X1, X2....)
 
 type can be one of 'table, 'array, 'list, or 'plist to yield
 difference result types.  For array, first index yields row, second
 yields field/column.  For list, result is a list of field-lists."
-  (let ((length (table-length table))
-        (field-names (or field-names (field-names table))))
-    (case type
-      (table
-       (make-table
-        ;; code reuse
-        (table-map row-fn table
-                   :type 'list)
-        :field-names field-names))
-      (array
-       (let* ((width (table-width table))
-              (result (make-array (list length width))))
+  (let* ((length (table-length table))
+         (field-names (proper-field-names field-names))
+         (field-name-check-p t)
+         (field-keywords (field-names->keywords field-names)))
+    (flet ((row->plist (row)
+             ;; on first call, check for field-names and set correctly
+             ;; if needed
+             (when (and (not field-names-supplied-p)
+                        field-name-check-p)
+               (setf field-name-check-p nil)
+               (when (keywordp (car row))
+                 (setf field-names
+                       (proper-field-names
+                        (loop
+                          for i from 0
+                          for s in row
+                          when (evenp i)
+                            collect (string s)))))
+               (unless field-names
+                 (setf field-names
+                       (proper-field-names
+                        (loop
+                          for x from 1 to (length row)
+                          collecting
+                          (format nil "x~a" x)))))
+               (setf field-keywords
+                     (field-names->keywords field-names)))
+             (typecase (car row)
+               (null nil)
+               (keyword row)
+               (t (mapcan (lambda (k v)
+                            (list k v))
+                          field-keywords
+                          row))))
+           (row->list (row)
+             (typecase (car row)
+               (null nil)
+               (keyword (loop
+                          for i from 0
+                          for x in row
+                          when (oddp i)
+                            collect x))
+               (t row))))
+      (case type
+        (table
+         (make-table
+          ;; code reuse
+          (apply #'table-map row-fn table
+                 :type 'plist
+                 (when field-names-supplied-p
+                   (list :field-names field-names)))))
+        (array
+         (let* ((width (table-width table))
+                (result (make-array (list length width))))
+           (loop
+             for i below length
+             do
+                (let ((row
+                        (row->list
+                         (apply row-fn
+                                (table-ref table i :type 'plist)))))
+
+                  (loop
+                    for j below width
+                    for x in row
+                    do (setf (aref result i j)
+                             x))))
+           result))
+        (list
          (loop
            for i below length
-           do
-              (let ((row (apply row-fn
-                                (table-ref table i :type 'list))))
-                (loop
-                  for j below width
-                  for x in row
-                  do (setf (aref result i j)
-                           x))))
-         result))
-      (list
-       (loop
-         for i below length
-         collecting
-         (apply row-fn
-                (table-ref table i :type 'list))))
-      (plist
-       (let* ((field-names
-                (or field-names
-                    (field-names table)))
-              (field-syms (mapcar (lambda (s) (intern s :keyword))
-                                  field-names)))
-         (mapcar (lambda (row)
-                   (mapcan (lambda (k f)
-                             (list k f))
-                           field-syms
-                           row))
-                 (table-map row-fn table :type 'list)))))))
+           collecting
+           (row->list
+            (apply row-fn
+                   (table-ref table i :type 'plist)))))
+        (plist
+         (loop
+           for i below length
+           collecting
+           (row->plist
+            (apply row-fn
+                   (table-ref table i :type 'plist)))))))))
+(setf (symbol-function 'tmap) #'table-map)
 
 ;; Utilities using map:
 (defun table->plist (table)
@@ -298,14 +415,26 @@ the front of the columns list or the end.")
         table))))
 
 (defgeneric insert! (table &rest rows)
-  (:documentation "Insert row into table.  Rows should be lists.")
+  (:documentation "Insert row into table.  Rows should be plists or lists.")
   (:method ((table table) &rest rows)
     (with-accessors ((data data)) table
       (flet ((insert (row)
-               (map nil (lambda (col new-field)
-                          (vector-push-extend new-field col))
-                    data
-                    row)))
+               (typecase (car row)
+                 (keyword
+                  (let ((row
+                          (loop
+                            for k in (field-keywords table)
+                            collect
+                            (getf row k))))
+                    (map nil (lambda (col new-field)
+                               (vector-push-extend new-field col))
+                         data
+                         row)))
+                 (t
+                  (map nil (lambda (col new-field)
+                             (vector-push-extend new-field col))
+                       data
+                       row)))))
         (map nil #'insert rows)
         table))))
 
@@ -360,12 +489,11 @@ the front of the columns list or the end.")
   ;; Boolean function case:
   (:method ((table table) (condition function) &key &allow-other-keys)
     (let ((indices nil))
-      (let ((i 0))
-        (dotable (row table)
-          (when (apply condition
-                       row)
-            (push i indices))
-          (incf i)))
+      (loop
+        for i below (table-length table)
+        for row = (table-ref table i :type 'plist)
+        when (apply condition row)
+          do (push i indices))
       (delete! table
                (nreverse indices)
                :sorted-p t))))
@@ -480,22 +608,27 @@ given by the test-fn.
 
 3. Returning a table with rows given by the groups and columns given by the accumulated result of row-reduce-fn.
 
-aggregator should accept all table fields as distinct input
-arguments and return a list of values to be considered the fields for
-the resulting aggregate table."
+aggregator should accept all table fields as distinct input keyword
+arguments and return a plist of values to be considered the fields for
+the resulting aggregate table.  If lists of values are returned, then
+field-names should be supplied or default field names will be
+generated."
   ;; aggregation:
   (let* ((agg-map (make-hash-table :test test)))
-    (dotable (row table)
-      (let* ((group (apply group-fn row)))
-        (let (aggfn)
-          ;; ensure agg is in agg-map and get it into aggfn
-          (unless (setf aggfn (gethash group agg-map))
-            (setf aggfn
-                  (setf (gethash group agg-map)
-                        (funcall aggregator group))))
-          ;; Execute aggregation
-          (apply aggfn row))))
-    ;; Form new table by a call to each aggfn in agg-map with no
+    (loop
+      for i below (table-length table)
+      for row = (table-ref table i :type 'plist)
+      do
+         (let* ((group (apply group-fn row)))
+           (let (aggfn)
+             ;; ensure agg is in agg-map and get it into aggfn
+             (unless (setf aggfn (gethash group agg-map))
+               (setf aggfn
+                     (setf (gethash group agg-map)
+                           (funcall aggregator group))))
+             ;; Execute aggregation
+             (apply aggfn row))))
+    ;; Form new table by a call to each aggfn in agg-map with not
     ;; argument:
     (make-table
      (loop
@@ -525,12 +658,9 @@ aggregation, e.g. in the agg-result.
 agg-result is a list of aggregate values to return per-group, and will
 be treated as rows in the resulting aggregate table.
 
-table-field-lambda-list can be a lambda list for the function that
-will receive all table fields as distinct arguments, or it can just be
-a list of symbols to be bound to those fields.  This is for
-convienence, as an implicit &optional will be added to the front of
-the lambda list.  Omitting the &optional was found to be a common
-mistake, hence this special behavior.
+table-field-lambda-list will be treated as if supplied to tlambda, so
+it should be a list of field arguments to be received by the function
+being mapped across the table row plists.
 
 This is useful for creating an aggregation to use with
 aggregate.
@@ -544,11 +674,6 @@ aggregation function, i.e. they can declare things about the arguments
 in the lambda list but not about the group (might fix in future)."
   (alexandria:with-gensyms (args)
     (let ((group (or group (gensym "group")))
-          (table-field-lambda-list
-            (if (or (member '&rest table-field-lambda-list)
-                    (member '&optional table-field-lambda-list))
-                table-field-lambda-list
-                (cons '&optional table-field-lambda-list)))
           (aggs (loop
                   for b in agg-bindings collecting (gensym (string (first b)))))
           (declarations
@@ -576,7 +701,10 @@ in the lambda list but not about the group (might fix in future)."
                                  collecting
                                  `(,fsym (,fsym)))
                (lambda (&rest ,args)
-                 (destructuring-bind ,table-field-lambda-list ,args
+                 (destructuring-bind
+                     (&key ,@table-field-lambda-list
+                      &allow-other-keys)
+                     ,args
                    ,@declarations
                    (if ,args
                        (progn ,@agg-body)
@@ -593,7 +721,7 @@ which receives fields as distinct arguments.")
     (make-table
      (remove-if-not (lambda (row)
                       (apply fn row))
-                    (table->list tab))
+                    (table->plist tab))
      :field-names (field-names tab))))
 
 
@@ -624,49 +752,75 @@ or NIL when a join of the rows should be accepted or rejected.
                (make-array (table-length t2)
                            :element-type 'bit
                            :initial-element 0)))
+         (lfns (field-names t1))
+         (rfns (field-names t2))
+         (field-names (if field-names
+                          field-names
+                          (proper-field-names
+                           (append lfns rfns))))
+         (new-rfns (subseq field-names
+                           (length lfns)))
+         (rfns-map (let ((ht (make-hash-table :test 'eq)))
+                     (loop
+                       for old in (field-names->keywords rfns)
+                       for new in (field-names->keywords new-rfns)
+                       do (setf (gethash old ht) new))
+                     ht))
          (field-names (or field-names
-                          (append (field-names t1)
-                                  (field-names t2))))
+                          (append lfns
+                                  rfns)))
          ;; results pushed into list instead of table for efficiency
          (result nil)
-         (i2 0)
          included-p)
-    ;; switching arguments for right join
-    (when (eq type :right)
-      (rotatef t1 t2))
-    (dotable (r1 t1)
-      (setf i2 0
-            included-p nil)
-      (dotable (r2 t2)
-        (let ((j (funcall condition-fn r1 r2)))
-          (when j
-            (push (append r1 r2) result)
-            (when (and (not (eq type :inner))
-                       (not included-p))
-              (setf included-p t))
-            (when (eq type :full)
-              (setf (elt ri i2) 1))))
-        (incf i2))
-      (when (and (not (eq type :inner))
-                 (not included-p))
-        (push (append r1 (loop repeat (table-width t2) collect nil))
-              result)))
-    ;; fixing data & tables for right join:
-    (when (eq type :right)
-      (setf result
-            (mapcar (lambda (fs)
-                      (append (subseq fs (table-width t1))
-                              (subseq fs 0 (table-width t1))))
-                    result))
-      (rotatef t1 t2))
-    ;; post-processing missing right rows for full join:
-    (when (eq type :full)
-      (dotimes (i (table-length t2))
-        (when (zerop (elt ri i))
-          (push (append (loop repeat (table-width t1) collect nil)
-                        (table-ref t2 i))
-                result))))
-    (make-table (nreverse result) :field-names field-names)))
+    (flet ((fix-right-fields (field-plist)
+             ;; Fixes plist so that the fields coming from plist are
+             ;; converted to match the new field names
+             (let ((result (copy-list field-plist)))
+               (loop
+                 for c on result
+                 for i from 0
+                 when (evenp i)
+                   do (setf (car c)
+                            (gethash (car c) rfns-map))
+                 finally (return result)))))
+
+      ;; switching arguments for right join
+      (when (eq type :right)
+        (rotatef t1 t2))
+      (loop
+        for i1 below (tlength t1)
+        for r1 = (if (eq type :right)
+                     (fix-right-fields (tref t1 i1))
+                     (tref t1 i1))
+        do (setf included-p nil)
+           (loop
+             for i2 below (tlength t2)
+             for r2 = (if (not (eq type :right))
+                          (fix-right-fields (tref t2 i2))
+                          (tref t2 i2))
+             do
+                (let ((j (apply condition-fn (append r1 r2))))
+                  (when j
+                    (push (append r1 r2) result)
+                    (when (and (not (eq type :inner))
+                               (not included-p))
+                      (setf included-p t))
+                    (when (eq type :full)
+                      (setf (elt ri i2) 1)))))
+           (when (and (not (eq type :inner))
+                      (not included-p))
+             (push r1
+                   result)))
+      ;; fixing data & tables for right join:
+      (when (eq type :right)
+        (rotatef t1 t2))
+      ;; post-processing missing right rows for full join:
+      (when (eq type :full)
+        (dotimes (i (table-length t2))
+          (when (zerop (elt ri i))
+            (push (fix-right-fields (table-ref t2 i))
+                  result))))
+      (make-table (nreverse result) :field-names field-names))))
 
 ;; Binary hash equijoin function:
 ;;
@@ -770,19 +924,21 @@ type can be one of :inner (default), :left, :right, or :full."
                  (getfields row lfindices)))
         (let* ((lkey (if leq-p
                          #'lfields
-                         (lambda (x) (apply (first eqs) x))))
+                         (first eqs)))
                (rkey (if req-p
                          #'rfields
-                         (lambda (x) (apply (second eqs) x)))))
+                         (second eqs))))
           ;; setup maps
-          (let ((i -1))
-            (declare (fixnum i))
-            (dotable (r1 t1)
-              (push (incf i) (gethash (funcall lkey r1) lmap))))
-          (let ((i -1))
-            (declare (fixnum i))
-            (dotable (r2 t2)
-              (push (incf i) (gethash (funcall rkey r2) rmap)))))
+          (loop
+            for i below (table-length t1)
+            for r1 = (table-ref t1 i :type 'plist)
+            do
+               (push i (gethash (apply lkey r1) lmap)))
+          (loop
+            for i below (table-length t2)
+            for r2 = (table-ref t2 i :type 'plist)
+            do
+               (push i (gethash (apply rkey r2) rmap))))
         ;; Push intersection results:
         (loop
           for k being the hash-keys in lmap
@@ -854,16 +1010,6 @@ type can be one of :inner (default), :left, :right, or :full."
             &key (type :inner) (test 'equal) &allow-other-keys)
     (list :hash table condition type test)))
 
-(defun reverse-group-list (list group-lengths)
-  "Returns elements from list grouped into group sizes specified by
-group-lengths."
-  (let ((l list))
-    (nreverse
-     (mapcar (lambda (g)
-               (prog1 (subseq l 0 g)
-                 (setf l (nthcdr g l))))
-             group-lengths))))
-
 (defun join (table &rest joins)
   "Performs a series of joins on table using the specified list of joins.
 
@@ -900,11 +1046,7 @@ condition (inefficient, uses nested loop):
   tables in the join.  This was chosen to make it convenient to ignore
   arguments for tables that are unlikely to be involved in future
   joins."
-  (let* ((result table)
-         (table-widths
-           (mapcar #'table-width
-                   (cons table
-                         (mapcar #'second joins)))))
+  (let* ((result table))
     (loop
       for join in joins
       for i from 0
@@ -918,29 +1060,12 @@ condition (inefficient, uses nested loop):
                (case algo
                  (:loop
                    (%join-loop result table
-                               (let ((gls
-                                       (subseq table-widths 0 (1+ i))))
-                                 (lambda (left right)
-                                   (apply (the function condition)
-                                          right
-                                          (reverse-group-list
-                                           left gls))))
+                               (the function condition)
                                :type type))
                  (:hash
-                  (let ((eqs condition))
-                    (%join-hash result table
-                                (destructuring-bind (lf rf) eqs
-                                  (let ((gls
-                                          (subseq table-widths 0 (1+ i))))
-                                    (list
-                                     (lambda (&rest left-fields)
-                                       (apply lf
-                                              (reverse-group-list
-                                               left-fields gls)))
-                                     (lambda (&rest right-fields)
-                                       (funcall rf right-fields)))))
-                                :type type
-                                :test join-test))))))
+                  (%join-hash result table condition
+                              :type type
+                              :test join-test)))))
     result))
 
 (defun union (tables
