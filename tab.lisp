@@ -258,9 +258,10 @@ list of field values if field-names is supplied.  (Not supplying
 field-names but only supplying a list of results will result in
 default field names being supplied, e.g. X1, X2....)
 
-type can be one of 'table, 'array, 'list, or 'plist to yield
-difference result types.  For array, first index yields row, second
-yields field/column.  For list, result is a list of field-lists."
+type can be one of NIL, 'table, 'array, 'list, or 'plist to yield
+difference result types.  For NIL, no result is returned.  For array,
+first index yields row, second yields field/column.  For list, result
+is a list of field-lists."
   (let* ((length (table-length table))
          (field-names (proper-field-names field-names))
          (field-name-check-p t)
@@ -305,6 +306,12 @@ yields field/column.  For list, result is a list of field-lists."
                             collect x))
                (t row))))
       (case type
+        ((nil)
+         (loop
+           for i below length
+           do
+              (apply row-fn
+                     (table-ref table i :type 'plist))))
         (table
          (make-table
           ;; code reuse
