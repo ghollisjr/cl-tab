@@ -39,7 +39,9 @@
    :agg-log-sum
    :agg-mean
    :with-aggregation
-   :tlet
+   :tlambda
+   :fields
+   :field
    ;; CSV
    :write-csv
    :read-csv
