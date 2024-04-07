@@ -6,6 +6,9 @@
   (:export
    ;; control parameters
    :*field-case-convert*
+   ;; database connections
+   :database
+   :define-database
    ;; tables
    :table
    :make-table
@@ -32,6 +35,7 @@
    :on
    :union
    :distinct
+   :top
    :aggregate
    :agg
    :agg-sum

@@ -9,6 +9,7 @@
                :cl-ana)
   :components ((:file "package")
                (:file "macros")
+               (:file "database")
                (:file "tab")
                (:file "csv")
                (:file "sql")))
