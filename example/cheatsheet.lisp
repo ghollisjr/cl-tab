@@ -26,7 +26,12 @@ tab ; as a table
 ;;; above.
 ;;;
 ;;; The with-aggregation (with-agg shorthand) macro returns a function
-;;; that is expected by #'aggregate (agg shorthand)
+;;; that is expected by #'aggregate (agg shorthand).  As part of
+;;; aggregation, specific aggregation closures are needed.  Various
+;;; aggregation closures are already provided, e.g. #'agg-sum.  These
+;;; can be used in conjunction with #'agg and with-agg to perform
+;;; grouped and non-grouped aggregations.  Example grouped
+;;; aggregation:
 
 ;; select x as "x", sum(y) as "sum(y)" from tab group by x
 (agg (with-agg gx ; gx is bound to grouped value, x in this case
