@@ -47,19 +47,14 @@
                         :field-names '("a" "b")))
         (t2 (make-table '((1 2)
                           (3 4))
-                        :field-names '("c" "d")))
-        (t3 (make-table '((1 2)
-                          (3 4))
-                        :field-names '("e" "f"))))
+                        :field-names '("c" "d"))))
     (join t1
           (on t2
               ;; equijoin on t1.a = t2.c and t1.b = t2.d
-              (list (lambda (r1)
-                      (tlet (r1 t1)
-                        (list t1.a t1.b)))
-                    (lambda (r2)
-                      (tlet (r2 t2)
-                        (list t2.c t2.d))))
+              (list (tlambda (|a| |b|)
+                      (list |a| |b|))
+                    (tlambda (|c| |d|)
+                      (list |c| |d|)))
               :type :left))))
 
 (defun loop-join-test ()
