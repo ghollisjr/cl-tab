@@ -83,9 +83,10 @@ as follows:
 
 * symbol-macro fields: Returns all fields in row as a plist.
 
-fields is setf-able so that if desired, one can simply modify the
-fields in a row and then return some function of that modified row.
-Useful for simply changing values, adding/removing columns etc."
+fields and (field ...) are setf-able so that if desired, one can
+simply modify the fields in a row and then return some function of
+that modified row.  Useful for simply changing values, adding/removing
+columns etc."
   (alexandria:with-gensyms (row)
     `(lambda (&rest ,row)
        (destructuring-bind (&key ,@fields &allow-other-keys) ,row
