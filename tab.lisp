@@ -18,11 +18,11 @@
          :type list)
    (field-names :initarg :field-names
                 :documentation "list of table field names"
-                :accessor field-names
+                :reader field-names ; writer defined below
                 :type list)
    (field-keywords :initarg :field-keywords
                    :documentation "list of table field name keyword symbols"
-                   :accessor field-keywords
+                   :reader field-keywords ; writer defined below
                    :type list)
    (field-map :initarg :field-map
               :initform (make-hash-table :test #'equal)
@@ -35,12 +35,34 @@
             :accessor table-indices
             :type list)))
 
+(defun %init-field-map! (table)
+  "Setup field-map using field-names in table"
+  (clrhash (field-map table))
+  (loop
+    for f in (field-names table)
+    for i from 0
+    do (setf (gethash f (field-map table)) i)))
+
+(defmethod (setf field-names) (new (table table))
+  (setf new (proper-field-names new)
+        (slot-value table 'field-names) new)
+  (setf (slot-value table 'field-keywords)
+        (field-names->keywords new))
+  (%init-field-map! table)
+  new)
+
+(defmethod (setf field-keywords) (new (table table))
+  ;; rely on (setf field-names) to handle everything
+  (setf (field-names table)
+        (mapcar #'string new))
+  (field-keywords table))
+
 ;;; Proper field names:
 ;;;
 ;;; Proper field names are a list of field names so that every name is
 ;;; unique and obeys the case convention set by
 ;;; *field-name-case-convert*.
-(defun proper-field-names (field-names &optional (test #'equal))
+(defun proper-field-names (field-names)
   "Accepts a list of field names and modifies them to ensure that each
 field is unique and adheres to the standard set by
 *field-name-case-convert*.
@@ -51,7 +73,7 @@ any other field names."
   (let ((result (make-array (length field-names)
                             :initial-contents field-names)))
     (flet ((collides-p (n &optional (end 0))
-             (find n result :test test :end end)))
+             (find n result :test #'equal :end end)))
       (loop
         for n in field-names
         for i from 0
@@ -76,16 +98,13 @@ convention set by *field-name-case-convert*"
 (defmethod initialize-instance :after ((tab table) &rest init-args)
   (declare (ignorable init-args))
   ;; First fix field names
-  (setf (field-names tab)
+  (setf (slot-value tab 'field-names)
         (proper-field-names (field-names tab)))
   ;; Then set field symbols:
-  (setf (field-keywords tab)
+  (setf (slot-value tab 'field-keywords)
         (field-names->keywords (field-names tab)))
   ;; Establish name->index map
-  (loop
-    for f in (field-names tab)
-    for i from 0
-    do (setf (gethash f (field-map tab)) i)))
+  (%init-field-map! tab))
 
 (defgeneric table-length (table)
   (:documentation "Returns number of rows of table")
@@ -380,22 +399,28 @@ is a list of field-lists."
                         &key
                           end-p
                         &allow-other-keys)
-  (:documentation "Adds a new column to table with name and either a fixed value or a
-function which will be supplied the table's other fields as distinct
-arguments and which should return a value to insert as the new field
-value for each row.  If value-or-function is NIL, NIL will be inserted
-as new value of field.  end-p controls whether to add the column to
-the front of the columns list or the end.")
-  (:method ((table table) name &optional value-or-function
+  (:documentation "Adds a new column to table with name and either a fixed value, a list
+of values, or a function which will be supplied the table's other
+fields as distinct arguments and which should return a value to insert
+as the new field value for each row.  If value-or-function is NIL, NIL
+will be inserted as new value of field.  end-p controls whether to add
+the column to the front of the columns list or the end.")
+  (:method ((table table) name &optional value-or-list-or-function
             &key (end-p t)
             &allow-other-keys)
-    (let* ((fn (typecase value-or-function
+    (let* ((fn (typecase value-or-list-or-function
                  (null (constantly nil))
-                 (function value-or-function)
-                 (t (constantly value-or-function))))
+                 (list (let ((l value-or-list-or-function))
+                         (lambda (&rest args)
+                           (declare (ignore args))
+                           (pop l))))
+                 (function value-or-list-or-function)
+                 (t (constantly value-or-list-or-function))))
            (column
-             (apply #'map 'vector fn
-                    (data table))))
+             (make-array (tlength table)
+                         :initial-contents (tmap fn table :type 'list)
+                         :adjustable t
+                         :fill-pointer t)))
       (with-accessors ((field-names field-names)
                        (data        data))
           table
