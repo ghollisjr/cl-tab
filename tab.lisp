@@ -212,8 +212,10 @@ from plists, alists, other tables, CSVs, SQL queries etc.")
 
 ;;; Table row access:
 (defgeneric table-ref (table index &key type &allow-other-keys)
-  (:documentation "Return a row from the table as a sequence of data.
-type controls type of sequence.")
+  (:documentation "Return a row/column from the table as a sequence of data.
+type controls type of sequence.  If index is integer/list of integers,
+return row(s).  If index is string/list of strings, return
+field/column(s).")
   (:method ((table table) (index integer)
             &key (type 'plist))
     (case type
@@ -240,7 +242,9 @@ type controls type of sequence.")
               (test #'equal))
     (when index
       (mapcar
-       (lambda (f) (table-ref table f :test test :type type))
+       (lambda (f) (table-ref table f
+                         :test test
+                         :type (if (eq type 'plist) 'list type)))
        index))))
 (setf (symbol-function 'tref) #'table-ref)
 
@@ -1120,3 +1124,7 @@ supplied hash test parameter."
        for i in (nreverse rows)
        collect (table-ref table i))
      :field-names (field-names table))))
+
+(defun top (table &optional (n 1))
+  "Returns top row of table as p-list"
+  (subseq (table->plist table) 0 n))
