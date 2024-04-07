@@ -28,10 +28,16 @@ select * from INFORMATION_SCHEMA.TABLES
             ;; hash equijoin on addresses (yes, customer_id is better,
             ;; but I was curious how realistic chinook's data is, as
             ;; real data will have spurious entries)
-            (list (tlambda (|address| |city| |state| |country| |postal_code|)
-                    (list |address| |city| |state| |country| |postal_code|))
-                  (tlambda (|billing_address| |billing_city| |billing_state|
-                       |billing_country| |billing_postal_code|)
-                    (list |billing_address| |billing_city| |billing_state|
-                          |billing_country| |billing_postal_code|)))
+            (list (tlambda ()
+                    (list (field |address|)
+                          (field |city|)
+                          (field |state|)
+                          (field |country|)
+                          (field |postal_code|)))
+                  (tlambda ()
+                    (list (field |billing_address|)
+                          (field |billing_city|)
+                          (field |billing_state|)
+                          (field |billing_country|)
+                          (field |billing_postal_code|))))
             :type :full)))
