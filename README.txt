@@ -12,3 +12,10 @@ following structure:
 The DSL is more ambitious than the Lisp library, but given past
 successes with cl-ana.makeres-cpp and cl-opencl, I am optimistic that
 much progress can be made.
+
+For an accelerated guide to the library assuming knowledge of SQL, see:
+
+example/cheatsheet.lisp
+
+The other example files show specific uses in addition to what is
+covered in the cheat sheet file mentioned above.
