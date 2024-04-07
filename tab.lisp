@@ -344,9 +344,14 @@ is a list of field-lists."
          (loop
            for i below length
            collecting
-           (row->list
-            (apply row-fn
-                   (table-ref table i :type 'plist)))))
+           (let ((r (apply row-fn
+                           (table-ref table i :type 'plist))))
+             (cond
+               ((and (eq type 'list)
+                     (atom r))
+                r)
+               ((null r) nil)
+               (t (row->list r))))))
         (plist
          (loop
            for i below length
@@ -549,7 +554,7 @@ the front of the columns list or the end.")
 ;;;   used to return an aggregate table using #'aggregate.
 
 ;; Some basic aggregate functions:
-(defun agg (fn &optional (default-value 0))
+(defun agg-function (fn &optional (default-value 0))
   "Takes any function accepting at least 2 optional arguments and converts it to
 an aggregate function.  This works perfectly for functions that need
 no state management, aka pure functions.  It may work in other cases
@@ -568,26 +573,26 @@ Use this as a reference implementation for your own aggregation functions: They 
 ;; Count aggregation
 (setf (symbol-function 'agg-count)
       ;; alert: this is sneaky
-      (agg (lambda (v x)
-             (declare (ignore x))
-             (1+ v))
-           0))
+      (agg-function (lambda (v x)
+                      (declare (ignore x))
+                      (1+ v))
+                    0))
 (setf (documentation #'agg-count 'function)
       "Counting aggregation for use with aggregate.  See all aggregates
 via (apropos \"agg-\")")
 
 ;; Sum aggregation
 (setf (symbol-function 'agg-sum)
-      (agg #'+ 0))
+      (agg-function #'+ 0))
 (setf (documentation #'agg-sum 'function)
       "Sum aggregation for use with aggregate.  See all aggregates
 via (apropos \"agg-\")")
 
 ;; (Natural) Log-sum aggregration (log of product)
 (setf (symbol-function 'agg-log-sum)
-      (agg (lambda (v x)
-             (+ v (log x)))
-           0))
+      (agg-function (lambda (v x)
+                      (+ v (log x)))
+                    0))
 (setf (documentation #'agg-log-sum 'function)
       "Sum-of-logs or log-of-product aggregation for use with
 aggregate.  See all aggregates via (apropos \"agg-\")")
@@ -647,79 +652,7 @@ generated."
        for aggfn being the hash-values in agg-map
        collecting (alexandria:ensure-list (funcall aggfn)))
      :field-names field-names)))
-
-;;; Compound aggregation:
-(defmacro with-aggregation (group agg-bindings
-                            agg-result
-                            table-field-lambda-list
-                            &body agg-body)
-  "Macro that generates code to return a function that will create an
-aggregation function using aggregate functions that are provided in
-agg-bindings.
-
-Each agg-binding must be of the form (fsym agg-form) where agg-form
-evaluates to an aggregate closure.  This function will be bound to
-fsym as a callable function, e.g. (fsym ...) will work correclty as
-will (funcall #'fsym ...).  Simultaneously, for convenience, a
-symbol-macrolet for that same symbol (e.g. fsym) will be bound to a
-call to the closure with no arguments (e.g. (fsym)).  This allows the
-aggregation symbol to be used to access the value of the
-aggregation, e.g. in the agg-result.
-
-agg-result is a list of aggregate values to return per-group, and will
-be treated as rows in the resulting aggregate table.
-
-table-field-lambda-list will be treated as if supplied to tlambda, so
-it should be a list of field arguments to be received by the function
-being mapped across the table row plists.
-
-This is useful for creating an aggregation to use with
-aggregate.
-
-If group is NIL, then the group argument will not be accessible nor
-used in the aggregation (assumes single-group and therefore reasonable
-group-fn, e.g. (constantly t)).
-
-The first forms in agg-body can be declarations for the generated
-aggregation function, i.e. they can declare things about the arguments
-in the lambda list but not about the group (might fix in future)."
-  (alexandria:with-gensyms (args)
-    (let ((group (or group (gensym "group")))
-          (aggs (loop
-                  for b in agg-bindings collecting (gensym (string (first b)))))
-          (declarations
-            (remove-if-not (lambda (form) (and (listp form) (eq (first form) 'declare)))
-                           agg-body))
-          (agg-body
-            (remove-if (lambda (form) (and (listp form) (eq (first form) 'declare)))
-                       agg-body)))
-      `(lambda (,group)
-         (let (,@(loop
-                   for a in aggs
-                   for b in agg-bindings
-                   collecting `(,a ,(second b))))
-           (labels ,(loop
-                      for a in aggs
-                      for b in agg-bindings
-                      collecting
-                      (destructuring-bind (fsym form) b
-                        (declare (ignore form))
-                        `(,fsym (&rest ,args)
-                                (apply ,a ,args))))
-             (symbol-macrolet ,(loop
-                                 for b in agg-bindings
-                                 for fsym = (first b)
-                                 collecting
-                                 `(,fsym (,fsym)))
-               (lambda (&rest ,args)
-                 (destructuring-bind
-                     (&key ,@table-field-lambda-list
-                      &allow-other-keys)
-                     ,args
-                   ,@declarations
-                   (if ,args
-                       (progn ,@agg-body)
-                       ,agg-result))))))))))
+(setf (symbol-function 'agg) #'aggregate)
 
 ;;; Filters
 ;;;
@@ -1125,6 +1058,33 @@ supplied hash test parameter."
        collect (table-ref table i))
      :field-names (field-names table))))
 
+(defun table-difference (table1 table2
+                         &key
+                           (test #'equal)
+                           symmetric-p)
+  "Returns rows from table1 that are not present in table2 according to
+test function.
+
+If symmetric-p is T, then any rows that are only in either table are
+returned rather than rows only in table1."
+  (let ((result
+          (make-table
+           (set-difference (table->plist table1)
+                           (table->plist table2)
+                           :test test))))
+    (when symmetric-p
+      (setf result
+            (union (list result
+                         (make-table
+                          (set-difference (table->plist table2)
+                                          (table->plist table1)
+                                          :test test)))
+                   :all-p t ; duplicates preserved
+                   :test test)))
+    result))
+(setf (symbol-function 'tdiff) #'table-difference)
+
 (defun top (table &optional (n 1))
   "Returns top row of table as p-list"
-  (subseq (table->plist table) 0 n))
+  (when (plusp (tlength table))
+    (subseq (table->plist table) 0 n)))

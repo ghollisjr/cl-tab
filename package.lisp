@@ -26,7 +26,6 @@
    :table->list
    :table->plist
    :table->array
-   :dotable
    :add-field!
    :del-field!
    :insert!
@@ -34,15 +33,19 @@
    :join
    :on
    :union
+   :table-difference
+   :tdiff
    :distinct
    :top
    :aggregate
    :agg
+   :agg-function
    :agg-sum
    :agg-count
    :agg-log-sum
    :agg-mean
    :with-aggregation
+   :with-agg
    :tlambda
    :fields
    :field

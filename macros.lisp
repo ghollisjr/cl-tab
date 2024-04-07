@@ -27,6 +27,80 @@
                       `((,vars ,row)))
                ,@body)))))))
 
+;;; Compound aggregation:
+(defmacro with-aggregation (group agg-bindings
+                            agg-result
+                            table-field-lambda-list
+                            &body agg-body)
+  "Macro that generates code to return a function that will create an
+aggregation function using aggregate functions that are provided in
+agg-bindings.
+
+Each agg-binding must be of the form (fsym agg-form) where agg-form
+evaluates to an aggregate closure.  This function will be bound to
+fsym as a callable function, e.g. (fsym ...) will work correclty as
+will (funcall #'fsym ...).  Simultaneously, for convenience, a
+symbol-macrolet for that same symbol (e.g. fsym) will be bound to a
+call to the closure with no arguments (e.g. (fsym)).  This allows the
+aggregation symbol to be used to access the value of the
+aggregation, e.g. in the agg-result.
+
+agg-result is a list of aggregate values to return per-group, and will
+be treated as rows in the resulting aggregate table.
+
+table-field-lambda-list will be treated as if supplied to tlambda, so
+it should be a list of field arguments to be received by the function
+being mapped across the table row plists.
+
+This is useful for creating an aggregation to use with
+aggregate.
+
+If group is NIL, then the group argument will not be accessible nor
+used in the aggregation (assumes single-group and therefore reasonable
+group-fn, e.g. (constantly t)).
+
+The first forms in agg-body can be declarations for the generated
+aggregation function, i.e. they can declare things about the arguments
+in the lambda list but not about the group (might fix in future)."
+  (alexandria:with-gensyms (args)
+    (let ((group (or group (gensym "group")))
+          (aggs (loop
+                  for b in agg-bindings collecting (gensym (string (first b)))))
+          (declarations
+            (remove-if-not (lambda (form) (and (listp form) (eq (first form) 'declare)))
+                           agg-body))
+          (agg-body
+            (remove-if (lambda (form) (and (listp form) (eq (first form) 'declare)))
+                       agg-body)))
+      `(lambda (,group)
+         (let (,@(loop
+                   for a in aggs
+                   for b in agg-bindings
+                   collecting `(,a ,(second b))))
+           (labels ,(loop
+                      for a in aggs
+                      for b in agg-bindings
+                      collecting
+                      (destructuring-bind (fsym form) b
+                        (declare (ignore form))
+                        `(,fsym (&rest ,args)
+                                (apply ,a ,args))))
+             (symbol-macrolet ,(loop
+                                 for b in agg-bindings
+                                 for fsym = (first b)
+                                 collecting
+                                 `(,fsym (,fsym)))
+               (lambda (&rest ,args)
+                 (destructuring-bind
+                     (&key ,@table-field-lambda-list
+                      &allow-other-keys)
+                     ,args
+                   ,@declarations
+                   (if ,args
+                       (progn ,@agg-body)
+                       ,agg-result))))))))))
+(setf (macro-function 'with-agg) (macro-function 'with-aggregation))
+
 (defmacro tlet ((row table &key prefix (upcase-p t)) &body body)
   "Binds values from row to symbols with names taken from the table's
 field names, optionally first converted to upper case as per upcase-p,
