@@ -72,20 +72,22 @@ cl-csv:write-csv... functions, so they have the same usage."
              :stream stream
              :separator separator
              cl-csv-keyargs))
-    (dotable (row table
-                  (when nil-stream
-                    (get-output-stream-string stream)))
-      (apply #'cl-csv:write-csv-row
-             (map 'list
-                  ;; Look Ma, functional programming
-                  (if lisp-output-p
-                      (lambda (f)
-                        (format nil "~s" f))
-                      #'identity)
-                  row)
-             :stream stream
-             :separator separator
-             cl-csv-keyargs))))
+    (loop
+      for i below (tlength table)
+      for row = (tref table i :type 'list)
+      do
+         (apply #'cl-csv:write-csv-row
+                (map 'list
+                     (if lisp-output-p
+                         (lambda (f)
+                           (format nil "~s" f))
+                         #'identity)
+                     row)
+                :stream stream
+                :separator separator
+                cl-csv-keyargs))
+    (when nil-stream
+      (get-output-stream-string stream))))
 
 (defun read-csv (stream-or-string
                  &key
