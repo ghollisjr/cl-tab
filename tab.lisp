@@ -28,12 +28,7 @@
               :initform (make-hash-table :test #'equal)
               :documentation "hash table mapping from field name to column index"
               :accessor field-map
-              :type hash-table)
-   (indices :initform nil
-            :initarg :indices
-            :documentation "alist of table indexes"
-            :accessor table-indices
-            :type list)))
+              :type hash-table)))
 
 (defun %init-field-map! (table)
   "Setup field-map using field-names in table"
@@ -128,8 +123,7 @@ from plists, alists, other tables, CSVs, SQL queries etc.")
   (:method ((data table)
             &key
               field-names
-              empty-p
-              (copy-indices-p t))
+              empty-p)
     (make-instance 'table
                    :data
                    (unless empty-p
@@ -137,10 +131,7 @@ from plists, alists, other tables, CSVs, SQL queries etc.")
                              (data data)))
                    :field-names (if field-names
                                     field-names
-                                    (copy-list (field-names data)))
-                   :indices (when (and copy-indices-p
-                                       (not empty-p))
-                              (copy-tree (table-indices data))))))
+                                    (copy-list (field-names data))))))
 
 ;;; More on tables:
 ;;;
