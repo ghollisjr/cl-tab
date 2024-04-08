@@ -107,7 +107,7 @@ Access table data:
   (tref tab (list "x" "y" "z"))
 #+end_src
 
-Insert table data:
+Insert table data: (Table is modified)
 #+begin_src lisp
   ;; Insert a new row into table
   (insert! tab
