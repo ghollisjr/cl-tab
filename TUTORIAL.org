@@ -544,6 +544,15 @@ Adding columns is accomplished by =#'add-field!=:
 #+begin_src lisp
   ;; alter table tab add x int;
   (add-field! tab "x")
+
+  ;; add a new column with list of values:
+  (add-field! tab "x" (list 1 2 3))
+
+  ;; add a new column with a fixed value:
+  (add-field! tab "x" 1)
+
+  ;; add a new column which is a function of existing columns:
+  (add-field! tab "x" (tlambda (|a| |b|) (+ |a| |b|)))
 #+end_src
 
 ** ALTER TABLE ... DROP COLUMN <column>
