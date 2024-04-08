@@ -1,4 +1,4 @@
-* INTRODUCTION
+* Introduction
 cl-tab is a Common Lisp library designed to facilitate
 tabular/structured data analysis using a combination of
 
@@ -29,11 +29,28 @@ to greatly simplify writing code for data analysis, since dependency
 management will be automatically handled along with logging analysis
 results.
 
+* Installation & Load:
+Install quicklisp for dependencies, and then download the source and
+either load the cl-tab.asd file into lisp, or setup the path
+(e.g. edit
+
+~/.config/common-lisp/source-registry.conf.d/projects.conf
+
+on Linux).
+
+To load: Run
+
+#+begin_src lisp
+  (ql:quickload :cl-tab)
+  ;; used in this tutorial, advanced users can manage packages:
+  (in-package :tb)
+#+end_src
+
 * Tables
 Tables are the backbone of cl-tab.  Tables can be created via
 =#'make-table=:
 
-Examples:
+** Basic Table Usage:
 
 Create a table
 | x | y |
@@ -45,4 +62,107 @@ Create a table
   ;; plists are also supported:
   (make-table '((:|x| 1 :|y| 2)
                 (:|x| 3 :|y| 4)))
+#+end_src
+
+Copy a table
+#+begin_src lisp
+  ;; Assuming tab is a table, make a copy (including data):
+  (make-table tab)
+  ;; Can also copy only the structure, no data:
+  (make-table tab :empty-p t)
+  ;; Or you can copy the data, but change the field names:
+  (make-table tab :field-names '("new-name1" "new-name2"))
+#+end_src
+
+Access table data:
+#+begin_src lisp
+  ;; Get row 0 as a plist:
+  (tref tab 0)
+  ;; Or as a list:
+  (tref tab 0 :type 'list)
+  ;; Or as a vector:
+  (tref tab 0 :type 'vector)
+
+  ;; Get rows 0, 1, 2 as a list of plists:
+  (tref tab (list 0 1 2))
+  ;; Like above, :type can be used to change row data type:
+  (tref tab (list 0 1 2) :type 'list)
+
+  ;; Get column "x" as list:
+  (tref tab "x") ; columns default to list since plist makes no sense
+  ;; Or as a vector:
+  (tref tab "x" :type 'vector)
+
+  ;; Get multiple columns as list of lists:
+  (tref tab (list "x" "y" "z"))
+#+end_src
+
+Insert table data:
+#+begin_src lisp
+  ;; Insert a new row into table
+  (insert! tab
+           (list :|x| 1 :|y| 2))
+  ;; Can insert multiple rows:
+  (insert! tab
+           (list :|x| 1 :|y| 2)
+           (list :|x| 3 :|y| 4))
+#+end_src
+
+Delete table data: (Table is modified)
+#+begin_src lisp
+  ;; Delete first row from table:
+  (delete! tab 0)
+  ;; Delete multiple rows from table:
+  (delete! tab (list 0 1 2))
+  ;; Delete rows using a condition function:
+  (delete! tab
+           ;; Note: tlambda is a useful function creation operator for
+           ;; working with tables.  More on this later.
+           ;;
+           ;; This example uses (> |x| |y|) as the deletion condition.
+           (tlambda (|x| |y|) (> |x| |y|)))
+#+end_src
+
+Truncate table: (i.e. delete all rows; table is modified)
+#+begin_src lisp
+  ;; Much more efficient than e.g. (delete! tab (constantly t))
+  (truncate! tab)
+#+end_src
+** CSV I/O
+Alternatively, tables can be read from a CSV file:
+#+begin_src lisp
+  (with-open-file (f "/path/to/data.csv")
+    (read-csv f))
+#+end_src
+
+Or written to them:
+#+begin_src lisp
+  ;; assuming tab is a table:
+  (with-open-file (f "/path/to/data.csv"
+                     :direction :output
+                     :if-does-not-exist :create
+                     :if-exists :supersede)
+    (write-csv tab :stream f))
+#+end_src
+
+Notes:
+- =#'write-csv= will write to =*standard-output*= by default.
+- =#'write-csv= output formatting defaults to Lisp style, so that data
+  can automatically be read back from the file as it was when it was
+  written.  To override this, use =:lisp-p nil= as a keyword argument.
+** SQL I/O
+Tables can also be retrieved and sent through SQL database
+connections.  For details on establishing connections, see the
+Database section.
+
+Assuming a connection function =#'sql= has already been created, here
+are SQL I/O examples:
+
+#+begin_src lisp
+  ;; Get table from SQL server via query:
+  (sql "select * from tab")
+
+  ;; Write table data from local table `tab` to a SQL server table also
+  ;; named `tab`:
+  (table->sql tab "tab") ; can also specify schema or database if server allows
 #+end_src
