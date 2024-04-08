@@ -413,7 +413,7 @@ plists or lists as input, not tables.  As an example to show how to
 use tables as input:
 #+begin_src lisp
   ;; insert into tab1 select * from tab2;
-  (insert! tab1 (table->plist tab2))
+  (apply #'insert! tab1 (table->plist tab2))
 #+end_src
 
 ** JOIN
