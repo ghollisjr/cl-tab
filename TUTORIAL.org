@@ -1,0 +1,48 @@
+* INTRODUCTION
+cl-tab is a Common Lisp library designed to facilitate
+tabular/structured data analysis using a combination of
+
+1. In-memory processing through Common Lisp software.
+2. Any number of database servers that support a SQL connection.
+
+To this end, the following capabilities are provided:
+
+- Tables: Tables as data containers are supported with similar
+  functionality as that provided through e.g. Python's Pandas.
+
+- Table I/O: Table I/O to CSV files and SQL connections are supported.
+  This includes returning tables from SQL queries as well as sending
+  queries to create tables along with data insertion to a SQL server.
+
+- SQL operations: All ANSI SQL operations on in-memory tables are
+  supported through a functional API along with a handful of useful
+  variations or extensions of those operations.
+
+- Database connection management: A simple API for managing SQL server
+  connections is provided so as to simplify projects that require
+  connections to multiple servers.
+
+cl-tab uses clsql as a backend, and is designed to interface smoothly
+with cl-ana, although cl-ana's symbols are not exposed directly by
+cl-tab's package.  When combined with cl-ana.makeres, it is possible
+to greatly simplify writing code for data analysis, since dependency
+management will be automatically handled along with logging analysis
+results.
+
+* Tables
+Tables are the backbone of cl-tab.  Tables can be created via
+=#'make-table=:
+
+Examples:
+
+Create a table
+| x | y |
+|---+---|
+| 1 | 2 |
+| 3 | 4 |
+#+begin_src lisp
+  (make-table '((1 2) (3 4)) :field-names '("x" "y"))
+  ;; plists are also supported:
+  (make-table '((:|x| 1 :|y| 2)
+                (:|x| 3 :|y| 4)))
+#+end_src
