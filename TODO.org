@@ -24,6 +24,7 @@ Function plist conversions:
 - [X] %join-loop
 - [X] %join-hash
 - [X] filter
+- [ ] update!
 - [ ] Deprecate tlet
 - [X] Implement tlambda
 
