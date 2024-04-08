@@ -184,6 +184,76 @@ table data formatted as per Emacs's org-mode:
 #+begin_src lisp
 (table->org tab)
 #+end_src
+* Database connections
+cl-tab uses clsql as a backend to provide SQL connections, and
+additionally provides
+
+- =#'tb:query=: A function which wraps the functionality of
+  =#'clsql:query= and =#'clsql:execute-command= such that the returned
+  result is a tb:table, or, is optionally ignored.
+
+- =define-database=: A macro that simplifies database management by
+  defining a function that acts just like =#'tb:query=, but using a
+  specific database connection specified on definition as well as
+  allowing disconnect by sending the argument =:disconnect= instead of
+  a query argument.
+
+Example usages:
+#+begin_src lisp
+  ;; Connect to a PostgreSQL Chinook database using clsql and use
+  ;; tb:query to return a table result:
+  (clsql:connect '("localhost" "chinook" "user" "password")
+                 :database-type :postgresql)
+  (query "select * from customer") ; we're in the :tb package
+  ;; => tb:table result
+
+  ;; Define a specific connection to the chinook PostgreSQL database and
+  ;; use that database query function:
+  (define-database chinook
+    (clsql:connect '("localhost" "chinook" "user" "password")
+                 :database-type :postgresql))
+  (chinook "select * from customer") ; returns tb:table
+  (chinook :disconnect) ; disconnect via this argument
+  (chinook "select * from customer") ; automatic reconnection
+
+  ;; What is the connection information for #'chinook?
+  (chinook :info)
+  ;; What about just the connection object?
+  (chinook :conn)
+#+end_src
+
+Additionally, =#'tb:query= and database query functions defined with
+=define-database= allow lists of queries as arguments, returning a
+list of tables:
+#+begin_src lisp
+  (query (list "select 1"
+               "select 2")) ; => list of two tables
+  ;; One might use this to easily define unions of multiple queries,
+  ;; e.g.:
+  (union (query (list "select 1" "select 2"))) ; returns union of results
+#+end_src
+As mentioned previously, tables can be sent to a SQL server via
+=#'table->sql=.  This function generates queries to create a new table
+and then insert data into it using data from the local table supplied
+as an argument.  Because some tables may be large and thus performance
+may suffer if every single row required a query, the =:batch-size=
+argument allows more fine-tuned control:
+
+#+begin_src lisp
+  ;; Write a large table in batches of 50 rows/query:
+  (table->sql big-table
+              :batch-size 50)
+
+  ;; Example where we want to use the chinook connection instead:
+  (table->sql big-table
+              :batch-size 50
+              :database (chinook :conn))
+
+#+end_src
+
+The rest of the arguments should be clear from the documentation,
+e.g. =(documentation #'chinook 'function)= (you can inspect functions
+returned by =define-datbase=).
 * SQL Operations on Tables
 All ANSI SQL operations are supported by a functional API.  Rows are
 returned as plists, and functions from the user are also generally
