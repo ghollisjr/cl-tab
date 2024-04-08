@@ -564,7 +564,7 @@ Dropping columns is accomplished by =#'del-field!=:
 #+end_src
 
 For dropping multiple columns, call =#'del-field!= on each column
-which should be removed, e.g.:n
+which should be removed, e.g.:
 #+begin_src lisp
   ;; alter table tab drop column x, y, ...;
   (dolist (c columns-to-drop)
