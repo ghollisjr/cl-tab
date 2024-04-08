@@ -52,8 +52,9 @@
    ;; CSV
    :write-csv
    :read-csv
+   ;; org-mode
+   :table->org
    ;; SQL
    :query
    ;; misc
-   :plist
-   ))
+   :plist))
