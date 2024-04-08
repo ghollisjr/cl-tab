@@ -538,3 +538,25 @@ are supported via the =:symmetric-p= keyword argument:
   ;; (select * from b except select * from a)
   (tdiff a b :symmetric-p t)
 #+end_src
+** ALTER TABLE ... ADD <column>
+Adding columns is accomplished by =#'add-field!=:
+#+begin_src lisp
+  ;; alter table tab add x int;
+  (add-field! tab "x")
+#+end_src
+
+** ALTER TABLE ... DROP COLUMN <column>
+Dropping columns is accomplished by =#'del-field!=:
+#+begin_src lisp
+  ;; alter table tab drop column x;
+  (del-field! tab "x") ; using field name
+  (del-field! tab 0) ; using field index
+#+end_src
+
+For dropping multiple columns, call =#'del-field!= on each column
+which should be removed, e.g.:n
+#+begin_src lisp
+  ;; alter table tab drop column x;
+  (dolist (c columns-to-drop)
+    (del-field! tab c))
+#+end_src
