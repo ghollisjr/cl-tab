@@ -64,6 +64,16 @@ Create a table
                 (:|x| 3 :|y| 4)))
 #+end_src
 
+Note: Field names are guaranteed to be unique.  If a duplicate field
+name is supplied, it will be prefixed with '.' until it no longer
+collides with another field name.  E.g.
+#+begin_src lisp
+  (make-table '((1 2)) :field-names '("x" "x"))
+  ;; ==> Field names are ("x" ".x"), not ("x" "x")
+  (make-table '((1 2 3)) :field-names '("x" "x" "x"))
+  ;; ==> Field names are ("x" ".x" "..x"), not ("x" "x" "x")
+#+end_src
+
 Copy a table
 #+begin_src lisp
   ;; Assuming tab is a table, make a copy (including data):
@@ -150,6 +160,8 @@ Notes:
 - =#'write-csv= output formatting defaults to Lisp style, so that data
   can automatically be read back from the file as it was when it was
   written.  To override this, use =:lisp-p nil= as a keyword argument.
+  This is useful when e.g. data is not formatted as valid Lisp data
+  and must be parsed.
 ** SQL I/O
 Tables can also be retrieved and sent through SQL database
 connections.  For details on establishing connections, see the
@@ -171,4 +183,239 @@ As a convenience for printing tables, =#'table->org= allows output to
 table data formatted as per Emacs's org-mode:
 #+begin_src lisp
 (table->org tab)
+#+end_src
+* SQL Operations on Tables
+All ANSI SQL operations are supported by a functional API.  Rows are
+returned as plists, and functions from the user are also generally
+expected to return plists unless special arguments are provided which
+override this.
+
+A key macro to assist in making lambda functions easier to write so
+that they automatically handle table row plist arguments and also
+provide useful macros & symbol macros for working with table data is
+=tlambda=.  =tlambda= can be used to created functions as follows:
+
+#+begin_src lisp
+  (tlambda (field1 field2 ...)
+    ;; do something with fields
+    )
+#+end_src
+
+and effectively wraps whatever field symbols you provide in something
+like
+
+#+begin_src lisp
+  (lambda (&key field1 field2 ... &allow-other-keys)
+    ;; do something with fields
+    )
+#+end_src
+
+with the additional context that there are also macros and symbol
+macros defined:
+
+- =fields= is a symbol macro that returns the entire row as a plist.
+  It is setf-able.
+- =(fields <field-name-or-symbol>)= is a macro that returns a specific
+  field referenced by the name or symbol.  It is setf-able.
+
+Having mentioned =tlambda=, here are examples for each of the SQL
+operations using SQL and this library.
+** SELECT
+SELECT is sometimes as easy as returning the table.  Other times,
+=#'tmap= is needed.
+#+begin_src lisp
+   ;; select * from tab;
+   tab ; easy case
+
+   ;; select x, y from tab;
+   (tmap (tlambda (|x| |y|)
+           (list :|x| |x|
+                 :|y| |y|))
+         tab)
+
+   ;; select *, x+y as "z" from tab;
+   (tmap (tlambda (|x| |y|)
+           (append fields
+                   (list :|z| (+ |x| |y|))))
+         tab)
+   ;; Could also do this:
+   (tmap (tlambda () ; no need for args this time
+           (append fields
+                   (list :|z| (+ (field |x|)
+                                 (field |y|)))))
+         tab)
+#+end_src
+** SELECT ... WHERE
+Selections with a constraint are accomplished via #'filter and
+possibly #'tmap.
+
+#+begin_src lisp
+  ;; select * from tab where x > y;
+  (filter (tlambda (|x| |y|)
+            (> |x| |y|)
+            tab)
+  ;; select z from tab where x+y<z;
+  (tmap (tlambda (|z|) |z|)
+        (filter (tlambda (|x| |y| |z|)
+                  (< (+ |x| |y|) |z|))
+                tab))
+#+end_src
+
+** SELECT ... GROUP BY ...
+Aggregations and grouped aggregations are supported via =#'agg= and
+the helpful macro =with-agg=.
+
+#+begin_src lisp
+  ;; select sum(x) as "sum(x)" from tab
+  (agg (with-agg () ; group binding (not needed this time)
+           ((sum-x (agg-sum))) ; aggregate function bindings
+           (list :|sum(x)| sum-x) ; result row per-group
+           (|x|) ; per-row tlambda bindings
+         (sum-x |x|)) ; per-row tlambda body
+       tab)
+
+  ;; select sum(x) as "sum(x)", y from tab group by y
+  (agg (with-agg |y| ; group binding
+           ((sum-x (agg-sum))) ; aggregate function bindings
+           (list :|sum(x)| sum-x
+                 :|y| |y|) ; result row per-group
+           (|x|) ; per-row tlambda bindings
+         (sum-x |x|)) ; per-row tlambda body
+       tab
+       :group-fn (tlambda (|y|) |y|)) ; value to group by
+
+  ;; select count(*) as "count", sum(x) as "sum(x)", y, z from tab group by y, z
+  (agg (with-agg y-z ; group binding
+           (;; since 'count is cl symbol, have to change to count*
+            (count* (agg-count)) ; aggregate function bindings
+            (sum-x (agg-sum)))
+           (list :|count| count*
+                 :|sum(x)| sum-x
+                 :|y| (first y-z)
+                 :|z| (second y-z)) ; result row per-group
+           (|x|) ; per-row tlambda bindings
+         ;; per-row tlambda body
+         (sum-x |x|)
+         (count* t)) ; agg-count needs argument to actually count
+       tab
+       :group-fn (tlambda (|y| |z|) (list |y| |z|))) ; group by list of values
+#+end_src
+Aggregations are by far the ugliest part of the API, and it ultimately
+stems from being a combination of grouping, mapping, and aggregating
+simultaneously.  I hope to improve the aggregation API in the future.
+
+** SELECT ... GROUP BY ... HAVING
+This is just a filter after an aggregation, e.g.
+#+begin_src lisp
+  ;; select sum(x) as "sum(x)", y from tab group by y having y>0;
+  (filter (tlambda (|y|) (> |y| 0))
+          (agg (with-agg |y|
+                   ((sum-x (agg-sum)))
+                   (list :|sum(x)| sum-x
+                         :|y| |y|)
+                   (|x|)
+                 (sum-x |x|))
+               tab
+               :group-fn (tlambda (|y|) |y|)))
+#+end_src
+** INSERT INTO tab VALUES ...
+Insertion is provided via =#'insert!= as described in the earlier
+section on basic table usage.  However, =#'insert!= only supports
+plists or lists as input, not tables.  As an example to show how to
+use tables as input:
+#+begin_src lisp
+  ;; insert into tab1 select * from tab2;
+  (insert! tab1 (table->plist tab2)
+#+end_src
+
+** JOIN
+Joins are supported by the =#'join= and =#'on= functions.  There are
+two different join operations:
+
+- loop join: Works for all types of join conditions, but is slow
+  (nested loop over both tables).
+
+- hash equijoin: Works only for equivalence joins, but is fast (hashed
+  values join).
+#+begin_src lisp
+  ;; select * from a join b on a.x = b.y
+  ;; Using a loop join:
+  (join a
+        (on b
+            ;; single condition function means loop join
+            (tlambda (|x| |y|)
+              (equal |x| |y|))))
+  ;; Using a hash equijoin:
+  (join a
+        (on b
+            ;; list of 2 condition functions means hash join
+            (list (tlambda (|x|) |x|)
+                  (tlambda (|y|) |y|))))
+
+  ;; select * from a join b on a.x = b.x and a.y = b.y
+  (join a
+        (on b
+            ;; hashing lists of values
+            (list (tlambda (|x| |y|)
+                    (list |x| |y|))
+                  (tlambda (|x| |y|)
+                    (list |x| |y|)))))
+#+end_src
+Joins default to inner, as generally true for SQL.
+
+For left, right, and outer joins, pass =:type <type keyword>= to
+=#'on=, e.g.
+#+begin_src lisp
+  ;; select * from a left join b on a.x = b.y
+  (join a
+        (on b
+            ;; loop join
+            (tlambda (|x| |y|)
+              (equal |x| |y|))
+            :type :left)) ; left outer join
+  ;; select * from a full join b on a.x = b.y
+  (join a
+        (on b
+            ;; hash join
+            (list (tlambda (|x|) |x|)
+                  (tlambda (|y|) |y|))
+            :type :full)) ; full outer join
+#+end_src
+
+For loop joins, the unique field names behavior is of special
+importance, as tables with shared field names will have their fields
+passed with modified symbols to the loop join condition function as
+described before by prefixing each clashing symbol with a
+#\. character.
+
+E.g.
+#+begin_src lisp
+  ;; select * from a join b on a.x = b.x
+  (join a
+        (on b
+            (tlambda (|x| |.x|) ; .x is from b due to clashing field names
+              (equal |x| |.x|))))
+
+  ;; But, for hash equijoins this is not a concern:
+  (join a
+        (on b
+            (tlambda (|x|) |x|)
+            (tlambda (|x|) |x|))) ; x from b can be referenced directly
+#+end_src
+
+In practice, this is seldom a concern due to the rarity of the
+combined needs of a loop join and clashing field name comparison.
+
+** DELETE FROM ... / TRUNCATE TABLE ...
+Deletion and truncation are supported by =delete!= and =truncate!= as
+described in the earlier section.  They modify the table data, hence
+the ! suffix.
+
+E.g.
+#+begin_src lisp
+  ;; delete from tab where x > 1
+  (delete! tab (tlambda (|x|) (> |x| 1)))
+
+  ;; truncate table tab
+  (truncate! tab)
 #+end_src
