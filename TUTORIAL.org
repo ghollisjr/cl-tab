@@ -167,12 +167,12 @@ Tables can also be retrieved and sent through SQL database
 connections.  For details on establishing connections, see the
 Database section.
 
-Assuming a connection function =#'sql= has already been created, here
-are SQL I/O examples:
+Assuming a connection has already been established, here are SQL I/O
+examples:
 
 #+begin_src lisp
   ;; Get table from SQL server via query:
-  (sql "select * from tab")
+  (query "select * from tab")
 
   ;; Write table data from local table `tab` to a SQL server table also
   ;; named `tab`:
