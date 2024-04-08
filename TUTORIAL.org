@@ -146,7 +146,7 @@ Or written to them:
 #+end_src
 
 Notes:
-- =#'write-csv= will write to =*standard-output*= by default.
+- =#'write-csv= will return a string by default.
 - =#'write-csv= output formatting defaults to Lisp style, so that data
   can automatically be read back from the file as it was when it was
   written.  To override this, use =:lisp-p nil= as a keyword argument.
@@ -165,4 +165,10 @@ are SQL I/O examples:
   ;; Write table data from local table `tab` to a SQL server table also
   ;; named `tab`:
   (table->sql tab "tab") ; can also specify schema or database if server allows
+#+end_src
+** org-mode output
+As a convenience for printing tables, =#'table->org= allows output to
+table data formatted as per Emacs's org-mode:
+#+begin_src lisp
+(table->org tab)
 #+end_src
