@@ -12,11 +12,25 @@
                           (3 4))
                         :field-names '("e" "f"))))
     (join t1
-          (on t2 (tlambda (b c)
-                   (and b c (< b c)))
+          (on t2 (tlambda (|b| |c|)
+                   (< |b| |c|))
               :type :left)
-          (on t3 (tlambda (c e)
-                   (and c e (= c e)))
+          (on t3 (tlambda (|c| |e|)
+                   ;; note: need to check for NIL fields after prior
+                   ;; left-join above
+                   ;;
+                   ;; Another option in this case would be something
+                   ;; like:
+                   ;;
+                   ;; (unless (member nil fields)
+                   ;;   (= |c| |e|))
+                   ;;
+                   ;; to check for any missing fields due to prior
+                   ;; failed join.  But, each table's content is
+                   ;; different and can require different join
+                   ;; conditions; the above would assume no fields
+                   ;; should be NIL, whereas this does not.
+                   (and |c| |e| (= |c| |e|)))
               :type :left))))
 
 (defun example-join2 ()
