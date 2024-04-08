@@ -48,7 +48,7 @@ To load: Run
 
 * Tables
 Tables are the backbone of cl-tab.  Tables can be created via
-=#'make-table=:
+=#'make-table=.
 
 ** Basic Table Usage:
 
