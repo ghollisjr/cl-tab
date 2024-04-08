@@ -22,4 +22,4 @@ much progress can be made.
   example/cheatsheet.lisp
 
 The other example files show specific uses in addition to what is
-covered in the cheat sheet file mentioned above.
+covered in the tutorial and cheat sheet.
