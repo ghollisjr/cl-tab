@@ -3,7 +3,9 @@
 (in-package :tb)
 
 (defgeneric query (expr &key database result-p &allow-other-keys)
-  (:documentation "Runs query or queries based on expr using database and returning result depending on result-p"))
+  (:documentation "Runs query or list of queries based on expr using database
+ and returning result table or list of result tables if result-p is
+ non-NIL."))
 
 (defmethod query ((query-expression string)
                   &key
