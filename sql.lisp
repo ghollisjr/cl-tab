@@ -99,7 +99,7 @@ database specified.
     (let* ((types (or types (table-sql-types table)))
            (queries
              (list* (format nil
-                            "create table ~a (~{~a ~a~^, ~});"
+                            "create table ~a (~{\"~a\" ~a~^, ~});"
                             name
                             (apply #'append
                                    (mapcar #'list
@@ -115,7 +115,7 @@ database specified.
                                    for j from (* i batch-size)
                                      below (min (table-length table)
                                                 (* (1+ i) batch-size))
-                                   collect (table-ref table j)))
+                                   collect (table-ref table j :type 'list)))
                                (vstrings
                                  (mapcar (lambda (row)
                                            (format nil "(~{~a~^, ~})"
