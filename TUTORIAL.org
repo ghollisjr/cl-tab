@@ -157,11 +157,12 @@ Or written to them:
 
 Notes:
 - =#'write-csv= will return a string by default.
-- =#'write-csv= output formatting defaults to Lisp style, so that data
-  can automatically be read back from the file as it was when it was
-  written.  To override this, use =:lisp-p nil= as a keyword argument.
-  This is useful when e.g. data is not formatted as valid Lisp data
-  and must be parsed.
+- =#'read-csv= and =#'write-csv= formatting defaults to Lisp style, so
+  that data can automatically be read back from the file as it was
+  when it was written.  To override this, use =:lisp-p nil= as a
+  keyword argument.  This is useful when e.g. data is not formatted as
+  valid Lisp data and must be parsed, or when data is meant for
+  external tools like MS Excel.
 ** SQL I/O
 Tables can also be retrieved and sent through SQL database
 connections.  For details on establishing connections, see the
