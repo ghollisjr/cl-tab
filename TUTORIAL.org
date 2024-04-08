@@ -245,6 +245,23 @@ SELECT is sometimes as easy as returning the table.  Other times,
                                  (field |y|)))))
          tab)
 #+end_src
+** SELECT DISTINCT ...
+Distinct selections are provided by =#'distinct=:
+#+begin_src lisp
+  ;; select distinct * from tab;
+  (distinct tab)
+
+  ;; select distinct x, y from tab;
+  (distinct tab
+            :row-fn (tlambda (|x| |y|)
+                      (list :|x| |x| 
+                            :|y| |y|)))
+
+  ;; For distinct row-fn, can also just return list instead of plist:
+  (distinct tab
+            :row-fn (tlambda (|x| |y|)
+                      (list |x| |y|)))
+#+end_src
 ** SELECT ... WHERE
 Selections with a constraint are accomplished via #'filter and
 possibly #'tmap.
@@ -418,4 +435,36 @@ E.g.
 
   ;; truncate table tab
   (truncate! tab)
+#+end_src
+
+** UNION / UNION ALL
+Union & union all are supported via =#'union=:
+#+begin_src lisp
+  ;; select * from a union select * from b;
+  (union (list a b))
+
+  ;; select * from a union all select * from b;
+  (union (list a b) :all-p t)
+#+end_src
+
+** EXCEPT
+Table differences are provided via =#'table-difference= or the
+shorthand =#'tdiff=:
+#+begin_src lisp
+  ;; select * from a except select * from b
+  (tdiff a b)
+
+  ;; If more complex selections used, need tmap:
+  ;; select x, y from a except select x, y from b
+  (tdiff (tmap (tlambda (|x| |y|) (list :|x| |x| :|y| |y|)) a)
+         (tmap (tlambda (|x| |y|) (list :|x| |x| :|y| |y|)) b))
+#+end_src
+
+For convenience, since symmetric differences are often desired, they
+are supported via the =:symmetric-p= keyword argument:
+#+begin_src lisp
+  ;; (select * from a except select * from b)
+  ;; union all
+  ;; (select * from b except select * from a)
+  (tdiff a b :symmetric-p t)
 #+end_src
