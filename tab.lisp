@@ -254,7 +254,10 @@ field/column(s).")
       (mapcar
        (lambda (f) (table-ref table f
                          :test test
-                         :type (if (eq type 'plist) 'list type)))
+                         :type (if (and (stringp f)
+                                        (eq type 'plist))
+                                   'list
+                                   type)))
        index))))
 (setf (symbol-function 'tref) #'table-ref)
 
