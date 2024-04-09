@@ -443,10 +443,10 @@ described in the basic table usage section.
 #+begin_src lisp
   ;; update tab set x=5 where y>3;
   (update! tab
-           (tlambda ()
-             (setf (field |x|) 5)
+           (tlambda (|x|)
+             (setf |x| 5) ; can also do (setf (field |x|) 5)
              fields) ; need to return new row
-           (tlambda (|y|) (> |y| 3))
+           (tlambda (|y|) (> |y| 3))) ; condition function
 #+end_src
 
 ** JOIN
