@@ -322,7 +322,10 @@ Example:
 I prefer only using =tlambda*= for quick and dirty prototyping, since
 using it in production software would likely make debugging a
 nightmare as final result data would suddenly all become NIL due to a
-field name being incorrect.
+field name being incorrect.  One major downside to =tlambda*= is that,
+while the unbound variables will automatically be bound to correct
+values, they will no longer be setf-able as they are in =tlambda=
+ordinarily.
 
 Having mentioned =tlambda=, here are examples for each of the SQL
 operations using SQL and this library.
