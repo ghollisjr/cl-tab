@@ -91,15 +91,11 @@ in the lambda list but not about the group (might fix in future)."
                                         for fsym = (first b)
                                         collecting
                                         `(,fsym (,fsym)))
-                      (lambda (&rest ,args)
-                        (destructuring-bind
-                            (&key ,@table-field-lambda-list
-                             &allow-other-keys)
-                            ,args
-                          ,@declarations
-                          (if ,args
-                              (progn ,@agg-body)
-                              ,agg-result)))))))))
+                      (tlambda (,@table-field-lambda-list)
+                        ,@declarations
+                        (if fields
+                            (progn ,@agg-body)
+                            ,agg-result))))))))
       (if group-fn
           `(list ,agg-fn-form ,group-fn)
           agg-fn-form))))
