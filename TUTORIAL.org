@@ -152,7 +152,7 @@ Truncate table: (i.e. delete all rows; table is modified)
   (truncate! tab)
 #+end_src
 ** CSV I/O
-Alternatively, tables can be read from a CSV file:
+Tables can be read from a CSV file:
 #+begin_src lisp
   (with-open-file (f "/path/to/data.csv")
     (read-csv f))
