@@ -542,14 +542,15 @@ described in the basic table usage section.
 #+end_src
 
 ** JOIN
-Joins are supported by the =#'join= and =#'on= functions.  There are
-two different join operations:
+Joins are supported by the =#'join= and =#'on= functions, with a
+useful macro =on-keys= for easy key joins.  There are two different
+join operations:
 
 - loop join: Works for all types of join conditions, but is slow
   (nested loop over both tables).
 
-- hash equijoin: Works only for equivalence joins, but is fast (hashed
-  values join).
+- hash equijoin: Works only for equivalence joins (including key
+  joins), but is fast (hashed values join).
 #+begin_src lisp
   ;; select * from a join b on a.x = b.y
   ;; Using a loop join:
@@ -573,6 +574,22 @@ two different join operations:
                     (list |x| |y|))
                   (tlambda (|x| |y|)
                     (list |x| |y|)))))
+  ;; Same thing but using convenience macro on-keys:
+  (join a
+        (on-keys b (|x| |y|)))
+  ;;; on-keys is flexible and supports a variety of usages:
+  ;; select * from a join b on a.x = b.y and a.y = b.z
+  (join a
+        (on-keys b
+                 (|x| |y|)
+                 (|y| |z|)))
+  ;; select * from a left join b on a.x = b.x
+  (join a (on-keys b |x| :type :left))
+  ;; select * from a full join b on a.x = b.y -- with case-insensitive test
+  (join a (on-keys b |x| |y| :type :full :test 'equalp))
+  ;;; The main reason to not use on-keys for equivalence joins is if you
+  ;;; need a function of fields rather than plain fields, as otherwise
+  ;;; on-keys is much simpler to use.
 #+end_src
 Joins default to inner, as generally true for SQL.
 
@@ -593,7 +610,13 @@ For left, right, and outer joins, pass =:type <type keyword>= to
             (list (tlambda (|x|) |x|)
                   (tlambda (|y|) |y|))
             :type :full)) ; full outer join
+  ;; Same with on-keys:
+  (join a
+        (on-keys b |x| |y| :type :full))
 #+end_src
+The =:test= argument for equivalence joins also allows more fine-tuned
+control over the equivalence as illustrated in previous examples.  It
+has no effect on loop joins.
 
 For loop joins, the unique field names behavior is of special
 importance, as tables with shared field names will have their fields
