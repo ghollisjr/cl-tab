@@ -33,6 +33,7 @@
    :update!
    :join
    :on
+   :on-keys
    :union
    :table-difference
    :tdiff

@@ -153,3 +153,39 @@ exists in the table."
                                           (cell-error-name ,c))
                                          :keyword))))))
          ,@body))))
+
+(defmacro on-keys (table keys1
+                   &rest args)
+  "Convenience macro for hash equijoin on key(s) for tables.
+
+keys1 & keys2 can be lists of fields on which to equijoin, or just a
+single field symbol denoting single-key equijoin.
+
+If keys2 is not specified, then keys1 will be used from both tables.
+
+Also supports key arguments:
+* :type
+* :test
+type & test act just like they do for #'on.
+
+Examples:
+
+(on-keys tab x) ; join to tab on keys x from both tables
+(on-keys tab x y) ; join to tab on keys x from left and y from right
+(on-keys tab (x y) :type :full) ; full-join on x & y from both tables
+(on-keys tab (x y) (y z) :type :left :test 'equalp) ; left join with test"
+  (let ((keys2 nil))
+    ;; parse args
+    (unless (keywordp (car args))
+      (setf keys2 (pop args)))
+    (unless keys2 (setf keys2 keys1))
+    (destructuring-bind (&key test type) args
+      (unless type (setf type :inner))
+      (unless test (setf test ''equal))
+      (let ((keys1 (if (symbolp keys1) (list keys1) keys1))
+            (keys2 (if (symbolp keys2) (list keys2) keys2)))
+        `(on ,table
+             (list (tlambda ,keys1 (list ,@keys1))
+                   (tlambda ,keys2 (list ,@keys2)))
+             :type ,type
+             :test ,test)))))
