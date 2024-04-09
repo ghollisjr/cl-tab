@@ -302,6 +302,25 @@ macros defined:
 - =(fields <field-name-or-symbol>)= is a macro that returns a specific
   field referenced by the name or symbol.  It is setf-able.
 
+An additional convenient, likely inefficient, and potentially bad for
+debugging variant =tlambda*= is also provided.  =tlambda*=
+automatically binds unbound variables to a field named like the
+variable in the supplied row argument if available, otherwise NIL.
+
+Example:
+#+begin_src lisp
+  ;; Example of auto-binding unbound variables as a convenience:
+  (tmap (tlambda* () (list :|x| |x| :|y| |y|))
+        (make-table '((1 2) (3 4)) :field-names '("x" "y")))
+  ;; => returns a table with correct values for x & y
+
+#+end_src
+
+I prefer only using =tlambda*= for quick and dirty prototyping, since
+using it in production software would likely make debugging a
+nightmare as final result data would suddenly all become NIL due to a
+field name being incorrect.
+
 Having mentioned =tlambda=, here are examples for each of the SQL
 operations using SQL and this library.
 ** SELECT
