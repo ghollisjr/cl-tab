@@ -107,6 +107,19 @@ Access table data:
   (tref tab (list "x" "y" "z"))
 #+end_src
 
+Change table data: (Table is modified)
+#+begin_src lisp
+  ;; Set new value for first row:
+  (setf (tref tab 0)
+        (list :x 1 :y 2))
+  ;; Can also use lists:
+  (setf (tref tab 0 :type 'list)
+        (list 1 2))
+  ;; Or vectors:
+  (setf (tref tab 0 :type 'vector)
+        (vector 1 2))
+#+end_src
+
 Insert table data: (Table is modified)
 #+begin_src lisp
   ;; Insert a new row into table
@@ -406,7 +419,7 @@ This is just a filter after an aggregation, e.g.
                tab
                :group-fn (tlambda (|y|) |y|)))
 #+end_src
-** INSERT INTO tab VALUES ...
+** INSERT INTO
 Insertion is provided via =#'insert!= as described in the earlier
 section on basic table usage.  However, =#'insert!= only supports
 plists or lists as input, not tables.  As an example to show how to
@@ -414,6 +427,26 @@ use tables as input:
 #+begin_src lisp
   ;; insert into tab1 select * from tab2;
   (apply #'insert! tab1 (table->plist tab2))
+#+end_src
+
+** UPDATE
+Updates can be performed in two ways:
+
+- Using =(setf tref)=/=(setf table-ref)=
+- Using =#'update!=
+
+Using the =setf= methods for =table-ref=/=tref= has already been
+described in the basic table usage section.
+
+=#'update!= can be used as follows:
+
+#+begin_src lisp
+  ;; update tab set x=5 where y>3;
+  (update! tab
+           (tlambda ()
+             (setf (field |x|) 5)
+             fields) ; need to return new row
+           (tlambda (|y|) (> |y| 3))
 #+end_src
 
 ** JOIN
