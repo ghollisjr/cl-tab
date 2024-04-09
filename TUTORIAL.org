@@ -446,14 +446,12 @@ This is just a filter after an aggregation, e.g.
 #+begin_src lisp
   ;; select sum(x) as "sum(x)", y from tab group by y having y>0;
   (filter (tlambda (|y|) (> |y| 0))
-          (agg (with-agg |y|
+          (agg (with-agg (|y| (tlambda (|y|) |y|))
                    ((sum-x (agg-sum)))
                    (list :|sum(x)| sum-x
                          :|y| |y|)
-                   (|x|)
-                 (sum-x |x|))
-               tab
-               :group-fn (tlambda (|y|) |y|)))
+                   (|x|) (sum-x |x|))
+               tab))
 #+end_src
 ** INSERT INTO
 Insertion is provided via =#'insert!= as described in the earlier
