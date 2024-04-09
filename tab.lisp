@@ -268,29 +268,33 @@ field/column(s).")
        index))))
 (setf (symbol-function 'tref) #'table-ref)
 
-(defmethod (setf table-ref) (new (table table) index &key (type 'plist))
+(defmethod (setf table-ref) (new (table table) index &key &allow-other-keys)
+  "Sets a row in table located at integer index.  New row value can be
+a plist, list, or vector."
   (with-accessors ((data data)
                    (keyword-map keyword-map))
       table
-    (case type
+    (typecase new
       (vector
        (loop
          for c in data
          for n across new
          do (setf (aref c index) n)))
       (list
-       (loop
-         for c in data
-         for n in new
-         do (setf (aref c index) n)))
-      (plist
-       (do ((nnew new (cddr nnew)))
-           ((null nnew))
-         (let* ((k (car nnew))
-                (v (cadr nnew))
-                (i (gethash k keyword-map)))
-           (setf (aref (elt data i) index)
-                 v)))))
+       (if (keywordp (car new))
+           ;; plist
+           (do ((nnew new (cddr nnew)))
+               ((null nnew))
+             (let* ((k (car nnew))
+                    (v (cadr nnew))
+                    (i (gethash k keyword-map)))
+               (setf (aref (elt data i) index)
+                     v)))
+           ;; list
+           (loop
+             for c in data
+             for n in new
+             do (setf (aref c index) n)))))
     new))
 (setf (fdefinition '(setf tref))
       (function (setf table-ref)))
@@ -691,7 +695,7 @@ override the group function."
     (unless group-fn-supplied-p
       (setf group-fn (second aggregator)))
     (setf aggregator (first aggregator)))
-  
+
   (let* ((agg-map (make-hash-table :test test)))
     (loop
       for i below (table-length table)
