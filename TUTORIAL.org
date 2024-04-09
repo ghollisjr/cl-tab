@@ -325,7 +325,9 @@ nightmare as final result data would suddenly all become NIL due to a
 field name being incorrect.  One major downside to =tlambda*= is that,
 while the unbound variables will automatically be bound to correct
 values, they will no longer be setf-able as they are in =tlambda=
-ordinarily.
+ordinarily.  Another important caveat is that global/dynamic variables
+will not be rebound to a field value even if a field named like that
+symbol exists in the table.
 
 Having mentioned =tlambda=, here are examples for each of the SQL
 operations using SQL and this library.

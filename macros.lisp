@@ -138,7 +138,11 @@ simply changing values, adding/removing columns etc."
 (defmacro tlambda* ((&rest fields) &body body)
   "Variant of tlambda that automatically binds unbound variables to a
 field with the keyword version of that symbol if available, or NIL if
-not."
+not.
+
+NOTE: If a dynamic/global variable has already been defined, then this
+function will use that value even if a field named like that symbol
+exists in the table."
   (alexandria:with-gensyms (c)
     `(tlambda (,@fields)
        (handler-bind ((unbound-variable
