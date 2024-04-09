@@ -665,7 +665,7 @@ aggregate.  See all aggregates via (apropos \"agg-\")")
 
 (defun aggregate (aggregator table
                   &key
-                    (group-fn (constantly t))
+                    (group-fn (constantly t) group-fn-supplied-p)
                     (test 'equal)
                     field-names)
   "Return the aggregation produced by
@@ -681,8 +681,17 @@ aggregator should accept all table fields as distinct input keyword
 arguments and return a plist of values to be considered the fields for
 the resulting aggregate table.  If lists of values are returned, then
 field-names should be supplied or default field names will be
-generated."
-  ;; aggregation:
+generated.
+
+group-fn can also be set by supplying a list (agg-fn group-fn) as the
+aggregator argument.  However, the group-fn keyword argument will
+override the group function."
+  ;; Handle list form of aggregator argument
+  (when (listp aggregator)
+    (unless group-fn-supplied-p
+      (setf group-fn (second aggregator)))
+    (setf aggregator (first aggregator)))
+  
   (let* ((agg-map (make-hash-table :test test)))
     (loop
       for i below (table-length table)
