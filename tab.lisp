@@ -253,6 +253,10 @@ field/column(s).")
     (let ((index (gethash index (field-map table))))
       (when index
         (coerce (elt (data table) index) type))))
+  (:method ((table table) (index symbol)
+            &key
+              (type 'list))
+    (table-ref table (string index) :type type))
   (:method ((table table) (index list)
             &key
               (type 'plist)

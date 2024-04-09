@@ -102,6 +102,10 @@ Access table data:
   (tref tab "x") ; columns default to list since plist makes no sense
   ;; Or as a vector:
   (tref tab "x" :type 'vector)
+  ;; Using a keyword:
+  (tref tab :|x|)
+  ;; Or any symbol:
+  (tref tab '|x|)
 
   ;; Get multiple columns as list of lists:
   (tref tab (list "x" "y" "z"))
