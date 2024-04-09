@@ -28,7 +28,7 @@
                ,@body)))))))
 
 ;;; Compound aggregation:
-(defmacro with-aggregation (group agg-bindings
+(defmacro with-aggregation ((&optional group group-fn) agg-bindings
                             agg-result
                             table-field-lambda-list
                             &body agg-body)
@@ -63,42 +63,46 @@ The first forms in agg-body can be declarations for the generated
 aggregation function, i.e. they can declare things about the arguments
 in the lambda list but not about the group (might fix in future)."
   (alexandria:with-gensyms (args)
-    (let ((group (or group (gensym "group")))
-          (aggs (loop
-                  for b in agg-bindings collecting (gensym (string (first b)))))
-          (declarations
-            (remove-if-not (lambda (form) (and (listp form) (eq (first form) 'declare)))
-                           agg-body))
-          (agg-body
-            (remove-if (lambda (form) (and (listp form) (eq (first form) 'declare)))
-                       agg-body)))
-      `(lambda (,group)
-         (let (,@(loop
-                   for a in aggs
-                   for b in agg-bindings
-                   collecting `(,a ,(second b))))
-           (labels ,(loop
-                      for a in aggs
-                      for b in agg-bindings
-                      collecting
-                      (destructuring-bind (fsym form) b
-                        (declare (ignore form))
-                        `(,fsym (&rest ,args)
-                                (apply ,a ,args))))
-             (symbol-macrolet ,(loop
-                                 for b in agg-bindings
-                                 for fsym = (first b)
-                                 collecting
-                                 `(,fsym (,fsym)))
-               (lambda (&rest ,args)
-                 (destructuring-bind
-                     (&key ,@table-field-lambda-list
-                      &allow-other-keys)
-                     ,args
-                   ,@declarations
-                   (if ,args
-                       (progn ,@agg-body)
-                       ,agg-result))))))))))
+    (let* ((group (or group (gensym "group")))
+           (aggs (loop
+                   for b in agg-bindings collecting (gensym (string (first b)))))
+           (declarations
+             (remove-if-not (lambda (form) (and (listp form) (eq (first form) 'declare)))
+                            agg-body))
+           (agg-body
+             (remove-if (lambda (form) (and (listp form) (eq (first form) 'declare)))
+                        agg-body))
+           (agg-fn-form
+             `(lambda (,group)
+                (let (,@(loop
+                          for a in aggs
+                          for b in agg-bindings
+                          collecting `(,a ,(second b))))
+                  (labels ,(loop
+                             for a in aggs
+                             for b in agg-bindings
+                             collecting
+                             (destructuring-bind (fsym form) b
+                               (declare (ignore form))
+                               `(,fsym (&rest ,args)
+                                       (apply ,a ,args))))
+                    (symbol-macrolet ,(loop
+                                        for b in agg-bindings
+                                        for fsym = (first b)
+                                        collecting
+                                        `(,fsym (,fsym)))
+                      (lambda (&rest ,args)
+                        (destructuring-bind
+                            (&key ,@table-field-lambda-list
+                             &allow-other-keys)
+                            ,args
+                          ,@declarations
+                          (if ,args
+                              (progn ,@agg-body)
+                              ,agg-result)))))))))
+      (if group-fn
+          `(list ,agg-fn-form ,group-fn)
+          agg-fn-form))))
 (setf (macro-function 'with-agg) (macro-function 'with-aggregation))
 
 (defmacro tlambda ((&rest fields) &body body)
