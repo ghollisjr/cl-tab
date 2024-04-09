@@ -107,29 +107,45 @@ into a lambda list of the form `(&key ,@fields &allow-other-keys) so
 that any plist input can be parsed, and the fields that are desired by
 the user are automatically assigned to a specific symbol.
 
+fields is a variable bound to all fields in row as a plist.
+
 Also provided in the body of the tlambda are macros and symbol macros
 as follows:
 
 * macro (field <string-or-keyword>): Returns field value from
   row.
 
-* symbol-macro fields: Returns all fields in row as a plist.
+* symbol macros for any fields requested specifically in the
+  lambda-list.
 
 Field arguments listed in the lambda-list, fields, and (field ...) are
-setf-able so that if desired, one can simply modify the fields in a
-row and then return some function of that modified row.  Useful for
+all setf-able so that if desired, one can simply modify the fields in
+a row and then return some function of that modified row.  Useful for
 simply changing values, adding/removing columns etc."
-  (alexandria:with-gensyms (row)
-    `(lambda (&rest ,row)
-       (symbol-macrolet ((fields ,row))
-         (macrolet ((field (spec)
-                      (typecase spec
-                        (symbol `(getf fields ,(intern (string spec)
-                                                       :keyword)))
-                        (keyword `(getf fields ,spec))
-                        (string `(getf fields
-                                       ,(intern spec :keyword))))))
-           (symbol-macrolet (,@(loop
-                                 for field in fields
-                                 collect `(,field (field ,field))))
-             ,@body))))))
+  `(lambda (&rest fields)
+     (macrolet ((field (spec)
+                  (typecase spec
+                    (symbol `(getf fields ,(intern (string spec)
+                                                   :keyword)))
+                    (keyword `(getf fields ,spec))
+                    (string `(getf fields
+                                   ,(intern spec :keyword))))))
+       (symbol-macrolet (,@(loop
+                             for field in fields
+                             collect `(,field (field ,field))))
+         ,@body))))
+
+(defmacro tlambda* ((&rest fields) &body body)
+  "Variant of tlambda that automatically binds unbound variables to a
+field with the keyword version of that symbol if available, or NIL if
+not."
+  (alexandria:with-gensyms (c)
+    `(tlambda (,@fields)
+       (handler-bind ((unbound-variable
+                        (lambda (,c)
+                          (use-value
+                           (getf fields
+                                 (intern (string
+                                          (cell-error-name ,c))
+                                         :keyword))))))
+         ,@body))))

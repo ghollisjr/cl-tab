@@ -48,6 +48,7 @@
    :with-aggregation
    :with-agg
    :tlambda
+   :tlambda*
    :fields
    :field
    ;; CSV
