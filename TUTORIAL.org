@@ -113,10 +113,10 @@ Change table data: (Table is modified)
   (setf (tref tab 0)
         (list :x 1 :y 2))
   ;; Can also use lists:
-  (setf (tref tab 0 :type 'list)
+  (setf (tref tab 0)
         (list 1 2))
   ;; Or vectors:
-  (setf (tref tab 0 :type 'vector)
+  (setf (tref tab 0)
         (vector 1 2))
 #+end_src
 
