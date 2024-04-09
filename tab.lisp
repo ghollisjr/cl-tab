@@ -268,7 +268,35 @@ field/column(s).")
        index))))
 (setf (symbol-function 'tref) #'table-ref)
 
-(defmethod (setf table-ref) (new (table table) index &key &allow-other-keys)
+
+(defmethod (setf table-ref) (new (table table)
+                             (index string)
+                             &key &allow-other-keys)
+  "Sets a column in table named like index.  New column value can be any
+sequence, but should have same length as table.  (Old values beyond
+new column data length will remain unchanged.)"
+  (with-accessors ((data data)
+                   (field-map field-map))
+      table
+    (let* ((c (elt data (gethash index field-map)))
+           (i -1))
+      (block set
+        (map nil (lambda (f)
+                   (unless (< i (tlength table))
+                     (return-from set))
+                   (setf (aref c (incf i)) f))
+             new)))
+    new))
+
+(defmethod (setf table-ref) (new (table table)
+                             (index symbol)
+                             &key &allow-other-keys)
+  "Sets a column in table named like index.  New column value can be any
+sequence, but should have same length as table.  (Old values beyond
+new column data length will remain unchanged.)"
+  (setf (table-ref table (string index)) new))
+
+(defmethod (setf table-ref) (new (table table) (index integer) &key &allow-other-keys)
   "Sets a row in table located at integer index.  New row value can be
 a plist, list, or vector."
   (with-accessors ((data data)

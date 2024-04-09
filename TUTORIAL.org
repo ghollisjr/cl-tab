@@ -118,6 +118,19 @@ Change table data: (Table is modified)
   ;; Or vectors:
   (setf (tref tab 0)
         (vector 1 2))
+
+  ;; Can also set columns by name:
+  (setf (tref tab "x")
+        (list 5 6))
+  ;; Or by keyword:
+  (setf (tref tab :|x|)
+        (list 5 6))
+  ;; Or another symbol:
+  (setf (tref tab '|x|)
+        (list 5 6))
+  ;; Using any sequence:
+  (setf (tref tab "x")
+        (vector 5 6))
 #+end_src
 
 Insert table data: (Table is modified)
