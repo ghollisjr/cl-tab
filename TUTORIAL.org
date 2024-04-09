@@ -432,10 +432,10 @@ use tables as input:
 ** UPDATE
 Updates can be performed in two ways:
 
-- Using =(setf tref)=/=(setf table-ref)=
+- Using =(setf tref)= / =(setf table-ref)=
 - Using =#'update!=
 
-Using the =setf= methods for =table-ref=/=tref= has already been
+Using the =setf= methods for =table-ref= / =tref= has already been
 described in the basic table usage section.
 
 =#'update!= can be used as follows:
