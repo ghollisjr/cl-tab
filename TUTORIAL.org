@@ -371,7 +371,22 @@ the helpful macro =with-agg=.
   (agg (with-agg
            () ; group binding (not needed this time)
            ((sum-x (agg-sum))) ; aggregate function bindings
-           (list :|sum(x)| sum-x) ; result row per-group
+           ;; Result row per-group: Note that sum-x is a symbol macro
+           ;; for (sum-x) just for convenience.  Calling one of the
+           ;; bound aggregation functions with no arguments returns the
+           ;; current aggregate result.
+           (list :|sum(x)| sum-x)
+           ;; The rest of the arguments are the tlambda fields followed
+           ;; by a tlambda function body for processing each row of a
+           ;; group using the aggregate functions bound above.
+           ;;
+           ;; Below is as if you had defined a function
+           ;;
+           ;; (tlambda (|x|) (sum-x |x|))
+           ;;
+           ;; and applied it to rows in each group, with the result that
+           ;; the sum-x closure would accumulate a sum of |x| values
+           ;; per-group.
            (|x|) ; per-row tlambda bindings
          (sum-x |x|)) ; per-row tlambda body
        tab)
@@ -420,8 +435,8 @@ things like this:
   ;; Define an aggregation to use on multiple tables:
   (defvar *my-fav-agg*
     (with-agg
-      (|y| (tlambda (|y|) (list |y|)))
-        ((count* (agg-count)) ; aggregate function bindings
+        (|y| (tlambda (|y|) (list |y|)))
+        ((count* (agg-count))
          (sum-x (agg-sum))
          (sum-z (agg-sum)))
         (list :|y| |y|
@@ -447,10 +462,9 @@ This is just a filter after an aggregation, e.g.
   ;; select sum(x) as "sum(x)", y from tab group by y having y>0;
   (filter (tlambda (|y|) (> |y| 0))
           (agg (with-agg (|y| (tlambda (|y|) |y|))
-                   ((sum-x (agg-sum)))
-                   (list :|sum(x)| sum-x
-                         :|y| |y|)
-                   (|x|) (sum-x |x|))
+                         ((sum-x (agg-sum)))
+                         (list :|sum(x)| sum-x :|y| |y|)
+                         (|x|) (sum-x |x|))
                tab))
 #+end_src
 ** INSERT INTO
