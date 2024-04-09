@@ -448,7 +448,7 @@ the helpful macro =with-agg=.
        tab)
 #+end_src
 Aggregations are by far the ugliest part of the API, and it ultimately
-stems from being a composition of grouping, mapping, and reducing
+stems from being a combination of grouping, mapping, and reducing
 simultaneously.  I hope to improve the aggregation API in the future,
 likely with a more sophisticated macro or possibly by relying on named
 aggregations.  However, I tried to avoid a stratified system of named
