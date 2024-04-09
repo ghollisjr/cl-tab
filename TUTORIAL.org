@@ -368,7 +368,8 @@ the helpful macro =with-agg=.
 
 #+begin_src lisp
   ;; select sum(x) as "sum(x)" from tab
-  (agg (with-agg () ; group binding (not needed this time)
+  (agg (with-agg
+           () ; group binding (not needed this time)
            ((sum-x (agg-sum))) ; aggregate function bindings
            (list :|sum(x)| sum-x) ; result row per-group
            (|x|) ; per-row tlambda bindings
@@ -376,34 +377,69 @@ the helpful macro =with-agg=.
        tab)
 
   ;; select sum(x) as "sum(x)", y from tab group by y
-  (agg (with-agg |y| ; group binding
+  (agg (with-agg
+           (|y| (tlambda (|y|) |y|)) ; group binding & group function, grouping by y
            ((sum-x (agg-sum))) ; aggregate function bindings
            (list :|sum(x)| sum-x
                  :|y| |y|) ; result row per-group
            (|x|) ; per-row tlambda bindings
          (sum-x |x|)) ; per-row tlambda body
-       tab
-       :group-fn (tlambda (|y|) |y|)) ; value to group by
+       tab)
 
   ;; select count(*) as "count", sum(x) as "sum(x)", y, z from tab group by y, z
-  (agg (with-agg y-z ; group binding
+  (agg (with-agg
+           ;; group binding for list
+           (y-z
+            (tlambda (|y| |z|)
+              (list |y| |z|)))
            (;; since 'count is cl symbol, have to change to count*
             (count* (agg-count)) ; aggregate function bindings
             (sum-x (agg-sum)))
-           (list :|count| count*
-                 :|sum(x)| sum-x
-                 :|y| (first y-z)
-                 :|z| (second y-z)) ; result row per-group
+           (destructuring-bind (|y| |z|) y-z
+             (list :|count| count*
+                   :|sum(x)| sum-x
+                   :|y| |y|
+                   :|z| |z|)) ; result row per-group
            (|x|) ; per-row tlambda bindings
-         ;; per-row tlambda body
+         ;; per-row tlambda body to perform aggregations on rows inside
+         ;; of each group
          (sum-x |x|)
          (count* t)) ; agg-count needs argument to actually count
-       tab
-       :group-fn (tlambda (|y| |z|) (list |y| |z|))) ; group by list of values
+       tab)
 #+end_src
 Aggregations are by far the ugliest part of the API, and it ultimately
-stems from being a combination of grouping, mapping, and aggregating
-simultaneously.  I hope to improve the aggregation API in the future.
+stems from being a composition of grouping, mapping, and aggregating
+simultaneously.  I hope to improve the aggregation API in the future,
+likely with a more sophisticated macro or possibly by relying on named
+aggregations.  However, I tried to avoid a stratified system of named
+aggregations to allow more freedom for the user.
+
+Despite the ugliness, the flexibility of the API allows one to do
+things like this:
+#+begin_src lisp
+  ;; Define an aggregation to use on multiple tables:
+  (defvar *my-fav-agg*
+    (with-agg
+      (|y| (tlambda (|y|) (list |y|)))
+        ((count* (agg-count)) ; aggregate function bindings
+         (sum-x (agg-sum))
+         (sum-z (agg-sum)))
+        (list :|y| |y|
+              :|count| count*
+              :|sum(x)| sum-x
+              :|sum(z)| sum-z)
+        (|x| |z|)
+      (count* t)
+      (sum-x |x|)
+      (sum-z |z|))
+    "An aggregation to count rows, sum x, and sum z for each group of y in
+  a table.")
+
+  ;; Use the same aggregation on multiple tables:
+  (agg tab1 *my-fav-agg*)
+  (agg tab2 *my-fav-agg*)
+  (agg tab3 *my-fav-agg*)
+#+end_src
 
 ** SELECT ... GROUP BY ... HAVING
 This is just a filter after an aggregation, e.g.
