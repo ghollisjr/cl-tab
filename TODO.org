@@ -1,4 +1,4 @@
-* TODO [12/13] plist api conversion
+* TODO [14/15] plist api conversion
 All table functions should use plists for table row I/O, passing these
 to functions and expecting them by default, with the exceptional case
 being lists of plain data and explicitly specified field names.
@@ -24,8 +24,9 @@ Function plist conversions:
 - [X] %join-loop
 - [X] %join-hash
 - [X] filter
-- [ ] update!
-- [ ] Deprecate tlet
+- [X] update!
+- [ ] table-sort! / tsort!
+- [X] Deprecate tlet (removed)
 - [X] Implement tlambda
 
 * TODO [10/14] Lisp library
