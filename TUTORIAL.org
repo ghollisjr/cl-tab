@@ -297,10 +297,13 @@ like
 with the additional context that there are also macros and symbol
 macros defined:
 
-- =fields= is a symbol macro that returns the entire row as a plist.
-  It is setf-able.
+- =fields= is a variable bound to the entire row as a plist.  It is
+  setf-able.
 - =(fields <field-name-or-symbol>)= is a macro that returns a specific
   field referenced by the name or symbol.  It is setf-able.
+- All of the fields listed as arguments to the =tlambda= function are
+  setf-able, so that =fields= returns a plist with the updated values.
+  They are implemented as symbol macros.
 
 An additional convenient, likely inefficient, and potentially bad for
 debugging variant =tlambda*= is also provided.  =tlambda*=
