@@ -30,6 +30,7 @@
    :del-field!
    :insert!
    :delete!
+   :update!
    :join
    :on
    :union

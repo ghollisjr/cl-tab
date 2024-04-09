@@ -28,22 +28,29 @@
               :initform (make-hash-table :test #'equal)
               :documentation "hash table mapping from field name to column index"
               :accessor field-map
-              :type hash-table)))
+              :type hash-table)
+   (keyword-map :initarg :keyword-map
+                :initform (make-hash-table :test #'eq)
+                :documentation "hash table mapping from field keyword to column index"
+                :accessor keyword-map
+                :type hash-table)))
 
-(defun %init-field-map! (table)
-  "Setup field-map using field-names in table"
+(defun %init-field-keyword-maps! (table)
+  "Setup field-map & keyword-map using field-names in table"
   (clrhash (field-map table))
   (loop
     for f in (field-names table)
+    for k in (field-keywords table)
     for i from 0
-    do (setf (gethash f (field-map table)) i)))
+    do (setf (gethash k (keyword-map table))
+             (setf (gethash f (field-map table)) i))))
 
 (defmethod (setf field-names) (new (table table))
   (setf new (proper-field-names new)
         (slot-value table 'field-names) new)
   (setf (slot-value table 'field-keywords)
         (field-names->keywords new))
-  (%init-field-map! table)
+  (%init-field-keyword-maps! table)
   new)
 
 (defmethod (setf field-keywords) (new (table table))
@@ -99,7 +106,7 @@ convention set by *field-name-case-convert*"
   (setf (slot-value tab 'field-keywords)
         (field-names->keywords (field-names tab)))
   ;; Establish name->index map
-  (%init-field-map! tab))
+  (%init-field-keyword-maps! tab))
 
 (defgeneric table-length (table)
   (:documentation "Returns number of rows of table")
@@ -260,6 +267,33 @@ field/column(s).")
                                    type)))
        index))))
 (setf (symbol-function 'tref) #'table-ref)
+
+(defmethod (setf table-ref) (new (table table) index &key (type 'plist))
+  (with-accessors ((data data)
+                   (keyword-map keyword-map))
+      table
+    (case type
+      (vector
+       (loop
+         for c in data
+         for n across new
+         do (setf (aref c index) n)))
+      (list
+       (loop
+         for c in data
+         for n in new
+         do (setf (aref c index) n)))
+      (plist
+       (do ((nnew new (cddr nnew)))
+           ((null nnew))
+         (let* ((k (car nnew))
+                (v (cadr nnew))
+                (i (gethash k keyword-map)))
+           (setf (aref (elt data i) index)
+                 v)))))
+    new))
+(setf (fdefinition '(setf tref))
+      (function (setf table-ref)))
 
 ;;; Table mapping:
 (defun table-map (row-fn table
@@ -584,7 +618,7 @@ Use this as a reference implementation for your own aggregation functions: They 
     (declare (ignore group))
     (let ((acc default-value))
       (lambda (&optional
-            (datum nil datum-supplied-p))
+                 (datum nil datum-supplied-p))
         (if datum-supplied-p
             (setf acc (funcall fn acc datum))
             acc)))))
@@ -1102,6 +1136,38 @@ returned rather than rows only in table1."
                    :test test)))
     result))
 (setf (symbol-function 'tdiff) #'table-difference)
+
+(defun update! (table set-fn
+                &optional
+                  (condition (constantly t))
+                &key (type 'plist))
+  "Updates table by applying set-fn to each row.  set-fn should return a
+new row of values to replace the current row.
+
+condition can be
+
+* a function receiving a row as a plist
+* an index denoting a specific row to update
+* a list of indices denoting rows to update
+
+type can be one of 'plist, 'list, or 'vector denoting the type of
+sequence returned by the set-fn."
+  (let ((indices
+          (typecase condition
+            (function
+             (loop
+               for i below (tlength table)
+               for row = (tref table i :type 'plist)
+               when (apply condition row)
+                 collect i))
+            (integer (list condition))
+            (list condition))))
+    (loop
+      for i in indices
+      do (setf (tref table i :type type)
+               (apply set-fn
+                      (tref table i :type 'plist))))
+    table))
 
 (defun top (table &optional (n 1))
   "Returns top row of table as p-list"
