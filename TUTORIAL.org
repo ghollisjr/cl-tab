@@ -255,11 +255,11 @@ argument allows more fine-tuned control:
 
 #+begin_src lisp
   ;; Write a large table in batches of 50 rows/query:
-  (table->sql big-table
+  (table->sql big-table "big_table"
               :batch-size 50)
 
   ;; Example where we want to use the chinook connection instead:
-  (table->sql big-table
+  (table->sql big-table "big_table"
               :batch-size 50
               :database (chinook :conn))
 
