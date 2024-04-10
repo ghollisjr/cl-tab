@@ -1,3 +1,7 @@
+* TODO Add sort analysis example at start of readme
+
+* TODO Add long analysis example section to readme
+
 * TODO Added options for weighted histograms
 Maybe even add binning options for hist-agg.
 
