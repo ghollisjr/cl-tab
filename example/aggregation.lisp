@@ -14,3 +14,9 @@
            (sumx x))
          table
          :field-names '("Y" "SUM(X)"))))
+
+(defun example-histogram ()
+  "Example of histogram aggregation"
+  (agg (hist-agg x y)
+       (table '((1 2 3) (3 2 1))
+              '(x y z))))
