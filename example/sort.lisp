@@ -1,0 +1,10 @@
+(require 'cl-tab)
+(in-package :tb)
+
+(defun example-sort ()
+  (tsort! (table '((1 2 3)
+                   (4 8 9)
+                   (4 5 6))
+                 '(x y z))
+          (order (list (field x) #'asc)
+                 (list (field y) #'desc))))

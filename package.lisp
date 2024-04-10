@@ -12,6 +12,7 @@
    ;; tables
    :table
    :make-table
+   :tab
    :data
    :table-ref
    :tref ; short-hand for table-ref
@@ -48,10 +49,16 @@
    :agg-mean
    :with-aggregation
    :with-agg
+   :table-sort!
+   :tsort!
+   :order
+   :asc
+   :desc
    :tlambda
    :tlambda*
    :fields
    :field
+   :field-plist
    ;; CSV
    :write-csv
    :read-csv

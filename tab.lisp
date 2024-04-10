@@ -136,9 +136,14 @@ from plists, alists, other tables, CSVs, SQL queries etc.")
                    (unless empty-p
                      (mapcar #'alexandria:copy-array
                              (data data)))
-                   :field-names (if field-names
-                                    field-names
-                                    (copy-list (field-names data))))))
+                   :field-names (mapcar #'string
+                                        (if field-names
+                                            field-names
+                                            (copy-list (field-names data)))))))
+;; shorthands:
+(defun table (data &optional field-names)
+  (make-table data :field-names field-names))
+(setf (symbol-function 'tab) #'table)
 
 ;;; More on tables:
 ;;;
@@ -162,6 +167,7 @@ from plists, alists, other tables, CSVs, SQL queries etc.")
                        &key
                          field-names)
   (declare (list field-names))
+  (setf field-names (mapcar #'string field-names))
   (labels (;; list-of-lists-p
            (lolp (x)
              (and (car x)
@@ -264,11 +270,11 @@ field/column(s).")
     (when index
       (mapcar
        (lambda (f) (table-ref table f
-                         :test test
-                         :type (if (and (stringp f)
-                                        (eq type 'plist))
-                                   'list
-                                   type)))
+                              :test test
+                              :type (if (and (stringp f)
+                                             (eq type 'plist))
+                                        'list
+                                        type)))
        index))))
 (setf (symbol-function 'tref) #'table-ref)
 
@@ -1213,6 +1219,117 @@ sequence returned by the set-fn."
                (apply set-fn
                       (tref table i :type 'plist))))
     table))
+
+(defgeneric asc (x y)
+  (:documentation "Returns T if x precedes y (or equal).  Works for a variety of types.")
+  (:method ((x number) (y number))
+    (<= x y))
+  (:method ((x character) (y character))
+    (char<= x y))
+  (:method ((x string) (y string))
+    (string<= x y))
+  (:method ((x symbol) (y symbol))
+    (or (eq x y)
+        (string<= (string x) (string y))))
+  (:method ((x sequence) (y sequence))
+    (map nil
+         (lambda (xx yy)
+           (unless (asc xx yy) (return-from asc NIL)))
+         x y)
+    T))
+
+(defgeneric desc (x y)
+  (:documentation "Returns T if y precedes x (or equal).  Works for a variety of types.")
+  (:method ((x number) (y number))
+    (>= x y))
+  (:method ((x character) (y character))
+    (char>= x y))
+  (:method ((x string) (y string))
+    (string>= x y))
+  (:method ((x symbol) (y symbol))
+    (or (eq x y)
+        (string>= (string x) (string y))))
+  (:method ((x sequence) (y sequence))
+    (map nil
+         (lambda (xx yy)
+           (unless (desc xx yy) (return-from desc NIL)))
+         x y)
+    T))
+
+(defun table-sort! (table predicate)
+  "Sorts table using predicate.  predicate will be supplied a list of all
+fields from a table, but with the value of each field being a
+list (left right) with the values of the left and right rows being
+compared in an effective self-join.
+
+predicate should return T when the left row comes before the right
+row, NIL if right should come before left."
+  (declare (optimize (debug 3)))
+  (let ((indices
+          (loop
+            for i below (tlength table) collect i)))
+    (setf indices
+          (sort indices
+                (lambda (iL iR)
+                  (let* ((rowL (tref table iL :type 'list))
+                         (rowR (tref table iR :type 'list))
+                         (row (mapcan (lambda (k L R)
+                                        (list k (list L R)))
+                                      (field-keywords table)
+                                      rowL
+                                      rowR)))
+                    (apply predicate row)))))
+    (let ((d (make-array (tlength table) :adjustable t :fill-pointer t)))
+      (map nil
+           (lambda (col)
+             ;; copy data to temp column
+             (dotimes (i (tlength table))
+               (setf (aref d i) (aref col i)))
+             ;; copy rearranged data back to column
+             (map nil
+                  (let ((index -1))
+                    (lambda (i)
+                      (setf (aref col (incf index))
+                            (aref d i))))
+                  indices))
+           (data table)))
+    table))
+(setf (symbol-function 'tsort!) #'table-sort!)
+
+(defun order (&rest order-specs)
+  "Returns a function useful for ordering rows of a table via #'tsort!.
+
+Each order-spec should be be a list containing
+
+* A tlambda function to produce values to compare between rows.
+* A comparison function or specifier for that expression.
+
+Note that the functions #'asc and #'desc are available to conveniently
+specify ascending and descending sort for many different types."
+  (declare (optimize (debug 3)))
+  (tlambda ()
+    (block comp
+      (loop
+        for spec in order-specs
+        do
+           (destructuring-bind (vfn cfn) spec
+             (let ((left
+                     (loop
+                       for i = 0 then (+ i 2)
+                       for cons = fields then (cddr cons)
+                       while cons
+                       append (list (car cons) (caadr cons))))
+                   (right
+                     (loop
+                       for i = 0 then (+ i 2)
+                       for cons = fields then (cddr cons)
+                       while cons
+                       append (list (car cons) (cadadr cons)))))
+               (unless (funcall cfn
+                              (apply vfn left)
+                              (apply vfn right))
+                 (return-from comp NIL)))))
+      T)))
 
 (defun top (table &optional (n 1))
   "Returns top row of table as p-list"

@@ -74,6 +74,23 @@ collides with another field name.  E.g.
   ;; ==> Field names are ("x" ".x" "..x"), not ("x" "x" "x")
 #+end_src
 
+For convenience, the functions =#'table= and =#'tab= are simpler
+versions of =#'make-table= that use an optional argument for
+=field-names= and take no other arguments.  Also for convenience,
+field names can be specified as symbols or strings:
+
+#+begin_src lisp
+  (make-table '((1 2) (3 4)) :field-names '(x y))
+  ;; => field names are "X" "Y"
+  (make-table '((1 2) (3 4)) :field-names '(:x :y)) ; keywords also work
+  (make-table '((1 2) (3 4)) :field-names '(|x| |y|)) ; lower-case
+
+  (table '((1 2))
+         '(x y)) ; shorthand
+  (tab '((1 2))
+       '(x y)) ; shorterhand
+#+end_src
+
 Copy a table
 #+begin_src lisp
   ;; Assuming tab is a table, make a copy (including data):
@@ -352,26 +369,57 @@ operations using SQL and this library.
 SELECT is sometimes as easy as returning the table.  Other times,
 =#'tmap= is needed.
 #+begin_src lisp
-   ;; select * from tab;
-   tab ; easy case
+  ;; select * from tab;
+  tab ; easy case
 
-   ;; select x, y from tab;
-   (tmap (tlambda (|x| |y|)
-           (list :|x| |x|
-                 :|y| |y|))
-         tab)
+  ;; select x, y from tab;
+  (tmap (tlambda (|x| |y|)
+          (list :|x| |x|
+                :|y| |y|))
+        tab)
 
-   ;; select *, x+y as "z" from tab;
-   (tmap (tlambda (|x| |y|)
-           (append fields
-                   (list :|z| (+ |x| |y|))))
-         tab)
-   ;; Could also do this:
-   (tmap (tlambda () ; no need for args this time
-           (append fields
-                   (list :|z| (+ (field |x|)
-                                 (field |y|)))))
-         tab)
+  ;; select *, x+y as "z" from tab;
+  (tmap (tlambda (|x| |y|)
+          (append fields
+                  (list :|z| (+ |x| |y|))))
+        tab)
+  ;; Could also do this:
+  (tmap (tlambda () ; no need for args this time
+          (append fields
+                  (list :|z| (+ (field |x|)
+                                (field |y|)))))
+        tab)
+#+end_src
+Since it is a fairly common task to select a subset of fields from a
+table, a macro =field= is provided outside of the =tlambda= context
+which returns a =tlambda= function that returns some number of fields
+from a table row.  The optional type argument defaults to returning a
+plist, but it is also possible to specify types =list= or =NIL= which
+can be used in different contexts (see documentation for more
+details).
+
+Selection example using =field=:
+#+begin_src lisp
+  ;; select x from tab
+  (tmap (field |x|) tab)
+  ;; select x, y from tab
+  (tmap (field (|x| |y|)) tab)
+#+end_src
+** SELECT TOP ... / SELECT ... LIMIT ...
+Although not a true replacement for the =top= / =limit= SQL operator,
+I found it useful to be able to quickly peek at data in a table.
+=#'top= is used to return the top N (default 1) rows in a table as a plist.
+
+E.g.
+#+begin_src lisp
+  ;; Get top row as plist
+  (top (table '((1 2) (3 4))
+              '("x" "y")))
+  ;; => (:|x| 1 :|y| 2)
+
+  ;; If you want another table to store top <number> of row(s), can do
+  ;; this:
+  (make-table (top tab <number>))
 #+end_src
 ** SELECT DISTINCT ...
 Distinct selections are provided by =#'distinct=:
@@ -404,6 +452,40 @@ possibly #'tmap.
         (filter (tlambda (|x| |y| |z|)
                   (< (+ |x| |y|) |z|))
                 tab))
+#+end_src
+** SELECT ... ORDER BY ...
+Table ordering is accomplished via =#'table-sort!= (=tsort!=
+shorthand), =#'order= =#'asc= and =#'desc=.  The =field= macro is
+especially useful here as will be shown.
+
+#+begin_src lisp
+  ;; select * from tab order by x asc;
+  (tsort! tab
+          (order (list (field |x| list)
+                       #'asc)))
+
+  ;; technically you can omit the type argument to field, but it might
+  ;; have a small performance cost:
+  (tsort! tab
+          (order (list (field |x|)
+                       #'asc)))
+
+  ;; highest performance in this case should be this:
+  (tsort! tab
+          (order (list (field |x| nil) ; return atom
+                       #'asc)))
+
+  ;; Ordering by multiple fields in multiple ways:
+  ;; select * from tab order by x asc, y desc, z asc;
+  (tsort! tab
+          (order (list (field |x| nil) #'asc)
+                 (list (field |y| nil) #'desc)
+                 (list (field |z| nil) #'asc)))
+  ;; aesthetic version:
+  (tsort! tab
+          (order (list (field |x|) #'asc)
+                 (list (field |y|) #'desc)
+                 (list (field |z|) #'asc)))
 #+end_src
 
 ** SELECT ... GROUP BY ...
@@ -464,6 +546,19 @@ the helpful macro =with-agg=.
          ;; of each group
          (sum-x |x|)
          (count* t)) ; agg-count needs argument to actually count
+       tab)
+
+  ;; A compressed example of above to reduce ugliness:
+  (agg (with-agg (y-z (field (|y| |z|) list))
+                 ((count* (agg-count))
+                  (sum-x (agg-sum)))
+                 (list :|count| count*
+                       :|sum(x)| sum-x
+                       :|y| (car y-z)
+                       :|z| (cadr y-z))
+                 (|x|)
+         (sum-x |x|)
+         (count* t))
        tab)
 #+end_src
 Aggregations are by far the ugliest part of the API, and it ultimately
