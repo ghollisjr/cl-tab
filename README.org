@@ -594,7 +594,7 @@ things like this:
   (agg tab2 *my-fav-agg*)
   (agg tab3 *my-fav-agg*)
 #+end_src
-
+*** Histograms
 With that spirit in mind, there is a macro =hist-agg= that defines
 discrete histogram aggregations and can be a model for your own new
 aggregations if desired.  E.g.:
