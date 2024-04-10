@@ -1,3 +1,6 @@
+* TODO Added options for weighted histograms
+Maybe even add binning options for hist-agg.
+
 * DONE Fix hist-agg field usage
 I used (field ...) without type in hist-agg, but I don't want
 performance to suffer since this looks like a useful operator.  Make
