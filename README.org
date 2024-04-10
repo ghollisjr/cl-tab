@@ -782,6 +782,9 @@ shorthand =#'tdiff=:
   ;; select x, y from a except select x, y from b
   (tdiff (tmap (tlambda (|x| |y|) (list :|x| |x| :|y| |y|)) a)
          (tmap (tlambda (|x| |y|) (list :|x| |x| :|y| |y|)) b))
+  ;; same with field macro:
+  (tdiff (tmap (field |x| |y|) a)
+         (tmap (field |x| |y|) b))
 #+end_src
 
 For convenience, since symmetric differences are often desired, they
