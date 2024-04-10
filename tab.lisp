@@ -1264,7 +1264,6 @@ compared in an effective self-join.
 
 predicate should return T when the left row comes before the right
 row, NIL if right should come before left."
-  (declare (optimize (debug 3)))
   (let ((indices
           (loop
             for i below (tlength table) collect i)))
@@ -1308,7 +1307,6 @@ Note that the functions #'asc and #'desc are available to conveniently
 specify ascending and descending sort for many different types.  For
 convenience, if :asc or :desc is used to specify the comparison, then
 #'asc or #'desc will be used."
-  (declare (optimize (debug 3)))
   (tlambda ()
     (block comp
       (loop
