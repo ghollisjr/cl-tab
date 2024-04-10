@@ -189,3 +189,34 @@ Examples:
                    (tlambda ,keys2 (list ,@keys2)))
              :type ,type
              :test ,test)))))
+
+(defmacro field (symbol-or-symbols &optional (type 'plist))
+  "Returns a tlambda function that returns the field or a list of the
+fields specified by the symbol or list of symbols that specify fields
+from a table row.  Especially useful for use with #'tsort!, #'order,
+#'agg, and #'tmap when you want to use a subset of fields from a
+table.
+
+If type is NIL, the return value of the tlambda function is either a
+field value if symbol-or-symbols is a symbol, or a list of fields if
+it is a list.
+
+If type is list, then a list is always returned.
+
+If type is plist, then a plist of the fields is returned."
+  (let ((symbols (if (listp symbol-or-symbols)
+                     symbol-or-symbols
+                     (list symbol-or-symbols))))
+    `(tlambda (,@symbols)
+       ,(case type
+          ((nil)
+           (if (listp symbol-or-symbols)
+               `(list ,@symbols)
+               (car symbols)))
+          (list
+           `(list ,@symbols))
+          (plist
+           `(list ,@(mapcan (lambda (sym)
+                              (list (intern (string sym) :keyword)
+                                    sym))
+                            symbols)))))))
