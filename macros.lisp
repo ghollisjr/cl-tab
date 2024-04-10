@@ -124,12 +124,12 @@ a row and then return some function of that modified row.  Useful for
 simply changing values, adding/removing columns etc."
   `(lambda (&rest fields)
      (macrolet ((field (spec)
-                  (typecase spec
-                    (symbol `(getf fields ,(intern (string spec)
-                                                   :keyword)))
-                    (keyword `(getf fields ,spec))
-                    (string `(getf fields
-                                   ,(intern spec :keyword))))))
+                    (typecase spec
+                      (symbol `(getf fields ,(intern (string spec)
+                                                     :keyword)))
+                      (keyword `(getf fields ,spec))
+                      (string `(getf fields
+                                     ,(intern spec :keyword))))))
        (symbol-macrolet (,@(loop
                              for field in fields
                              collect `(,field (field ,field))))
@@ -220,3 +220,14 @@ If type is plist, then a plist of the fields is returned."
                               (list (intern (string sym) :keyword)
                                     sym))
                             symbols)))))))
+
+(defmacro hist-agg (&rest fields)
+  "Returns an aggregation function that bins the fields specified and
+adds a |count| field to them."
+  (setf fields (mapcar (lambda (f) (intern (string f)))
+                       fields))
+  `(with-agg (g (field ,fields))
+             ((cnt (agg-count)))
+             (append g (list :|count| (cnt)))
+             ()
+     (cnt 1)))

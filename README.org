@@ -595,6 +595,16 @@ things like this:
   (agg tab3 *my-fav-agg*)
 #+end_src
 
+With that spirit in mind, there is a macro =hist-agg= that defines
+discrete histogram aggregations and can be a model for your own new
+aggregations if desired.  E.g.:
+#+begin_src lisp
+  ;; compute a histogram of (x,y) via aggregation:
+  (agg (hist-agg |x| |y|)
+       (table '((1 2 3) (3 2 1))
+              '(|x| |y| |z|)))
+#+end_src
+
 ** SELECT ... GROUP BY ... HAVING
 This is just a filter after an aggregation, e.g.
 #+begin_src lisp

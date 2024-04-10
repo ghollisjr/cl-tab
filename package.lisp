@@ -49,6 +49,7 @@
    :agg-mean
    :with-aggregation
    :with-agg
+   :hist-agg
    :table-sort!
    :tsort!
    :order
