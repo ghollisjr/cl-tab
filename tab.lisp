@@ -1305,7 +1305,9 @@ Each order-spec should be be a list containing
 * A comparison function or specifier for that expression.
 
 Note that the functions #'asc and #'desc are available to conveniently
-specify ascending and descending sort for many different types."
+specify ascending and descending sort for many different types.  For
+convenience, if :asc or :desc is used to specify the comparison, then
+#'asc or #'desc will be used."
   (declare (optimize (debug 3)))
   (tlambda ()
     (block comp
@@ -1313,6 +1315,9 @@ specify ascending and descending sort for many different types."
         for spec in order-specs
         do
            (destructuring-bind (vfn cfn) spec
+             (case cfn
+               (:asc (setf cfn #'asc))
+               (:desc (setf cfn #'desc)))
              (let ((left
                      (loop
                        for i = 0 then (+ i 2)
