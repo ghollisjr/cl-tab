@@ -470,6 +470,11 @@ especially useful here as will be shown.
           (order (list (field |x|)
                        #'asc)))
 
+  ;; also can use keywords for asc/desc:
+  (tsort! tab
+          (order (list (field |x|)
+                       :asc)))
+
   ;; highest performance in this case should be this:
   (tsort! tab
           (order (list (field |x| nil) ; return atom
@@ -483,9 +488,9 @@ especially useful here as will be shown.
                  (list (field |z| nil) #'asc)))
   ;; aesthetic version:
   (tsort! tab
-          (order (list (field |x|) #'asc)
-                 (list (field |y|) #'desc)
-                 (list (field |z|) #'asc)))
+          (order (list (field |x|) :asc)
+                 (list (field |y|) :desc)
+                 (list (field |z|) :asc)))
 #+end_src
 
 ** SELECT ... GROUP BY ...
