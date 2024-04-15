@@ -9,12 +9,11 @@
 ;;;;   will have some blemishes, e.g. strings will include quotation
 ;;;;   marks.
 ;;;;
-;;;; * To generate data more useful for foreign tools, use the
-;;;;   :lisp-output-p argument and set it to NIL when running
-;;;;   #'write-csv.  This will lead to default formatting for
-;;;;   output as per the other arguments passed through to the cl-csv
-;;;;   functions, which usually leads to useful interpretation by
-;;;;   foreign tools.
+;;;; * To generate data more useful for foreign tools, use the :lisp-p
+;;;;   argument and set it to NIL when running #'write-csv.  This will
+;;;;   lead to default formatting for output as per the other
+;;;;   arguments passed through to the cl-csv functions, which usually
+;;;;   leads to useful interpretation by foreign tools.
 ;;;;
 ;;;; * Writing is low-memory use, but reading does lead to at least 2x
 ;;;;   memory use for the table that is loaded until GC is called.
@@ -27,7 +26,7 @@
 (defun write-csv (table
                   &key
                     stream
-                    (lisp-output-p t)
+                    (lisp-p t)
                     (separator cl-csv:*separator*)
                     (field-names nil field-names-supplied-p)
                     (quote cl-csv:*quote*)
@@ -41,7 +40,7 @@ only data will be written.
 
 stream uses same semantics as cl-csv:write-csv, so NIL means return string.
 
-If lisp-output-p is T (default), then fields are written so that they
+If lisp-p is T (default), then fields are written so that they
 can be read back as Lisp data through #'read.  Otherwise, follows
 cl-csv behavior for data.
 
@@ -78,7 +77,7 @@ cl-csv:write-csv... functions, so they have the same usage."
       do
          (apply #'cl-csv:write-csv-row
                 (map 'list
-                     (if lisp-output-p
+                     (if lisp-p
                          (lambda (f)
                            (format nil "~s" f))
                          #'identity)
@@ -91,7 +90,7 @@ cl-csv:write-csv... functions, so they have the same usage."
 
 (defun read-csv (stream-or-string
                  &key
-                   (lisp-input-p t)
+                   (lisp-p t)
                    (field-names nil field-names-supplied-p)
                    csv-reader row-fn map-fn data-map-fn sample skip-first-p
                    (separator cl-csv:*separator*)
@@ -105,7 +104,7 @@ cl-csv:write-csv... functions, so they have the same usage."
   "Read CSV file into a table from stream-or-string using cl-csv read
 functions.
 
-If lisp-input-p is T (default), then fields are assumed to be written
+If lisp-p is T (default), then fields are assumed to be written
 in a format that can be read by #'read.  Otherwise, follows cl-csv
 behavior."
   (let ((cl-csv-keyargs
@@ -127,7 +126,7 @@ behavior."
         (apply #'cl-csv:read-csv
                stream-or-string
                cl-csv-keyargs)
-      (make-table (if lisp-input-p
+      (make-table (if lisp-p
                       (mapcar (lambda (row)
                                 (mapcar (lambda (field)
                                           (read-from-string field nil nil))

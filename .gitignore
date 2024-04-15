@@ -1,2 +1,3 @@
 .emacs_backups/
 scratch.lisp
+example/chinook-analysis/
