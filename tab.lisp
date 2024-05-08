@@ -1257,13 +1257,17 @@ sequence returned by the set-fn."
     T))
 
 (defun table-sort! (table predicate)
-  "Sorts table using predicate.  predicate will be supplied a list of all
-fields from a table, but with the value of each field being a
-list (left right) with the values of the left and right rows being
-compared in an effective self-join.
+  "Sorts table using predicate.  Use #'order to conveniently generate
+predicate function.
+
+predicate will be supplied a list of all fields from a table, but with
+the value of each field being a list (left right) with the values of
+the left and right rows being compared in an effective self-join.
 
 predicate should return T when the left row comes before the right
-row, NIL if right should come before left."
+row, NIL if right should come before left.
+
+#'order provides a convenient SQL-like interface for the predicate."
   (let ((indices
           (loop
             for i below (tlength table) collect i)))

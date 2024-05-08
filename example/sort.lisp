@@ -8,3 +8,12 @@
                  '(x y z))
           (order (list (field x) #'asc)
                  (list (field y) #'desc))))
+
+(defun example-filter-sort ()
+  (tsort! (filter (tlambda (x) (evenp x))
+                  (table '((1 2 3)
+                           (4 8 9)
+                           (4 5 6))
+                         '(x y z)))
+          (order (list (field x) :asc)
+                 (list (field z) :desc))))
