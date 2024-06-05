@@ -33,7 +33,8 @@ database are attempted.
 
 Lists of queries are also supported.
 
-If :conn is passed to the function, the connection object is returned.
+If :conn is passed to the function, the connection is made if needed
+and the connection object is returned.
 
 If :info is passed to the function, the connection information is
 returned as a plist.
@@ -53,13 +54,17 @@ the connection will be restarted."
              (null nil)
              (symbol
               (case query-or-op
-                (:conn ,c)
+                (:conn
+                 (ensure-connection)
+                 ,c)
                 (:info
                  (list :connection ,c
-                       :name (clsql:database-name ,c)
-                       :type (clsql:database-type ,c)))
+                       :name (when ,c (clsql:database-name ,c))
+                       :type (when ,c (clsql:database-type ,c))))
                 (:disconnect
-                 (clsql:disconnect :database ,c))))
+                 (when ,c
+                   (clsql:disconnect :database ,c)
+                   (setf ,c nil)))))
              (t
               (ensure-connection)
               (query query-or-op
