@@ -11,7 +11,7 @@
                   &key
                     (database clsql-sys:*default-database*)
                     (result-p t)
-                    &allow-other-keys)
+                  &allow-other-keys)
   "Front-end to clsql's query and execute-command functions that returns
 a table of results when result-p is non-NIL, and nothing when
 result-p is NIL."
@@ -19,7 +19,8 @@ result-p is NIL."
       (multiple-value-bind (results columns)
           (clsql:query query-expression
                        :database database)
-        (make-table results :field-names columns))
+        (when columns
+          (make-table results :field-names columns)))
       (clsql:execute-command query-expression
                              :database database)))
 
@@ -66,6 +67,7 @@ result-p is NIL."
 
 (defgeneric table->sql (table name
                         &key
+                          create-p
                           execute-p
                           database
                           db-type
@@ -75,6 +77,8 @@ result-p is NIL."
   (:documentation "Generates a list of SQL queries to create the table and insert data.
 If execute-p is non-NIL (default), executes those queries on the
 database specified.
+
+* create-p: Creates table when non-NIL.  If NIL, only inserts.
 
 * execute-p: Boolean controlling whether statements should be executed
   or only returned as a list of query strings.
@@ -91,6 +95,7 @@ database specified.
   single insert statement.")
   (:method ((table table) name
             &key
+              (create-p t)
               (execute-p t)
               (database clsql:*default-database*)
               db-type
@@ -100,32 +105,36 @@ database specified.
     (declare (ignore db-type))
     (let* ((types (or types (table-sql-types table)))
            (queries
-             (list* (format nil
-                            "create table ~a (~{\"~a\" ~a~^, ~});"
+             (append
+              (when create-p
+                (list
+                 (format nil
+                         "create table ~a (~{\"~a\" ~a~^, ~});"
+                         name
+                         (apply #'append
+                                (mapcar #'list
+                                        (field-names table)
+                                        types)))))
+              (let ((nbatches (ceiling (table-length table)
+                                       batch-size)))
+                (loop
+                  for i below nbatches
+                  collect
+                  (let* ((batch
+                           (loop
+                             for j from (* i batch-size)
+                               below (min (table-length table)
+                                          (* (1+ i) batch-size))
+                             collect (table-ref table j :type 'list)))
+                         (vstrings
+                           (mapcar (lambda (row)
+                                     (format nil "(~{~a~^, ~})"
+                                             (mapcar #'sql-convert row)))
+                                   batch)))
+                    (format nil "insert into ~a(~{\"~a\"~^,~}) values ~{~a~^, ~};"
                             name
-                            (apply #'append
-                                   (mapcar #'list
-                                           (field-names table)
-                                           types)))
-                    (let ((nbatches (ceiling (table-length table)
-                                             batch-size)))
-                      (loop
-                        for i below nbatches
-                        collect
-                        (let* ((batch
-                                 (loop
-                                   for j from (* i batch-size)
-                                     below (min (table-length table)
-                                                (* (1+ i) batch-size))
-                                   collect (table-ref table j :type 'list)))
-                               (vstrings
-                                 (mapcar (lambda (row)
-                                           (format nil "(~{~a~^, ~})"
-                                                   (mapcar #'sql-convert row)))
-                                         batch)))
-                          (format nil "insert into ~a values ~{~a~^, ~};"
-                                  name
-                                  vstrings)))))))
+                            (field-names table)
+                            vstrings)))))))
       (if execute-p
           (map nil
                (lambda (q) (clsql:execute-command q :database database))
