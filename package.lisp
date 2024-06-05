@@ -27,6 +27,7 @@
    :table->list
    :table->plist
    :table->array
+   :table->sql
    :add-field!
    :del-field!
    :insert!
