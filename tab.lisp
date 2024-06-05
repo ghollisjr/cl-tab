@@ -270,11 +270,11 @@ field/column(s).")
     (when index
       (mapcar
        (lambda (f) (table-ref table f
-                              :test test
-                              :type (if (and (stringp f)
-                                             (eq type 'plist))
-                                        'list
-                                        type)))
+                         :test test
+                         :type (if (and (stringp f)
+                                        (eq type 'plist))
+                                   'list
+                                   type)))
        index))))
 (setf (symbol-function 'tref) #'table-ref)
 
@@ -1013,10 +1013,10 @@ type can be one of :inner (default), :left, :right, or :full."
                ;; insert intersection rows
                (when rindices
                  (let ((r1s (mapcar (lambda (i)
-                                      (table-ref t1 i))
+                                      (table-ref t1 i :type 'list))
                                     lindices))
                        (r2s (mapcar (lambda (i)
-                                      (table-ref t2 i))
+                                      (table-ref t2 i :type 'list))
                                     rindices)))
                    (dolist (r1 r1s)
                      (dolist (r2 r2s)
@@ -1027,7 +1027,7 @@ type can be one of :inner (default), :left, :right, or :full."
                    (dotimes (i (length li))
                      (let ((present (plusp (elt li i))))
                        (unless present
-                         (push (append (table-ref t1 i)
+                         (push (append (table-ref t1 i :type 'list)
                                        (loop
                                          repeat (table-width t2)
                                          collect nil))
@@ -1039,7 +1039,7 @@ type can be one of :inner (default), :left, :right, or :full."
                          (push (append (loop
                                          repeat (table-width t1)
                                          collect nil)
-                                       (table-ref t2 i))
+                                       (table-ref t2 i :type 'list))
                                result))))))
           (case type
             (:full (lins) (rins))
@@ -1333,8 +1333,8 @@ convenience, if :asc or :desc is used to specify the comparison, then
                        while cons
                        append (list (car cons) (cadadr cons)))))
                (unless (funcall cfn
-                              (apply vfn left)
-                              (apply vfn right))
+                                (apply vfn left)
+                                (apply vfn right))
                  (return-from comp NIL)))))
       T)))
 
