@@ -270,11 +270,11 @@ field/column(s).")
     (when index
       (mapcar
        (lambda (f) (table-ref table f
-                         :test test
-                         :type (if (and (stringp f)
-                                        (eq type 'plist))
-                                   'list
-                                   type)))
+                              :test test
+                              :type (if (and (stringp f)
+                                             (eq type 'plist))
+                                        'list
+                                        type)))
        index))))
 (setf (symbol-function 'tref) #'table-ref)
 
@@ -649,21 +649,54 @@ the column to the front of the columns list or the end.")
 ;;;   used to return an aggregate table using #'aggregate.
 
 ;; Some basic aggregate functions:
-(defun agg-function (fn &optional (default-value 0))
+(defun agg-function (fn &optional (default-value 0) agg-all-p)
   "Takes any function accepting at least 2 optional arguments and converts it to
 an aggregate function.  This works perfectly for functions that need
 no state management, aka pure functions.  It may work in other cases
 on a case-by-case basis.
 
-Use this as a reference implementation for your own aggregation functions: They must accept a context, and then optional arguments for the accumulation and new datum."
+Use this as a reference implementation for your own aggregation functions: They must accept a context, and then optional arguments for the accumulation and new datum.
+
+NOTE: If NIL is supplied, then nothing is aggregated."
   (lambda (&optional group)
     (declare (ignore group))
     (let ((acc default-value))
       (lambda (&optional
-                 (datum nil datum-supplied-p))
-        (if datum-supplied-p
+            (datum nil datum-supplied-p))
+        (if (and datum-supplied-p
+                 (or agg-all-p datum))
             (setf acc (funcall fn acc datum))
             acc)))))
+
+;; Min/max aggregations
+(declaim (function asc desc))
+
+(setf (symbol-function 'agg-min)
+      (agg-function
+       (lambda (agg val)
+         (if (null agg)
+             val
+             (if (asc agg val)
+                 agg
+                 val)))
+       nil))
+(setf (documentation #'agg-min 'function)
+      "Minimization aggregation for use with aggregate.  See all aggregates
+via (apropos \"agg-\")")
+
+(setf (symbol-function 'agg-max)
+      (agg-function
+       (lambda (agg val)
+         (if (null agg)
+             val
+             (if (desc agg val)
+                 agg
+                 val)))
+       nil))
+(setf (documentation #'agg-max 'function)
+      "Maximization aggregation for use with aggregate.  See all aggregates
+via (apropos \"agg-\")")
+
 
 ;; Count aggregation
 (setf (symbol-function 'agg-count)
@@ -1220,6 +1253,15 @@ sequence returned by the set-fn."
                       (tref table i :type 'plist))))
     table))
 
+(defparameter *nil-order* :before
+  "Controls how NIL is treated when compared to other data.  These are
+the following values:
+
+- :before -> NIL is always listed first when data is sorted via #'asc/#'desc
+- :after -> NIL is always listed last when data is sorted via #'asc/#'desc
+- :greater -> NIL is considered greater than other data
+- :less -> NIL is considered less than other data")
+
 (defgeneric asc (x y)
   (:documentation "Returns T if x precedes y (or equal).  Works for a variety of types.")
   (:method ((x number) (y number))
@@ -1236,7 +1278,19 @@ sequence returned by the set-fn."
          (lambda (xx yy)
            (unless (asc xx yy) (return-from asc NIL)))
          x y)
-    T))
+    T)
+  (:method ((x null) y)
+    (ecase *nil-order*
+      (:before t)
+      (:after nil)
+      (:greater nil)
+      (:less t)))
+  (:method (x (y null))
+    (ecase *nil-order*
+      (:before nil)
+      (:after t)
+      (:greater t)
+      (:less nil))))
 
 (defgeneric desc (x y)
   (:documentation "Returns T if y precedes x (or equal).  Works for a variety of types.")
@@ -1254,7 +1308,19 @@ sequence returned by the set-fn."
          (lambda (xx yy)
            (unless (desc xx yy) (return-from desc NIL)))
          x y)
-    T))
+    T)
+  (:method ((x null) y)
+    (ecase *nil-order*
+      (:before t)
+      (:after nil)
+      (:greater t)
+      (:less nil)))
+  (:method (x (y null))
+    (ecase *nil-order*
+      (:before nil)
+      (:after t)
+      (:greater nil)
+      (:less t))))
 
 (defun table-sort! (table predicate)
   "Sorts table using predicate.  Use #'order to conveniently generate

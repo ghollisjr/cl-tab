@@ -6,6 +6,7 @@
   (:export
    ;; control parameters
    :*field-case-convert*
+   :*nil-order*
    ;; database connections
    :database
    :define-database
@@ -44,6 +45,8 @@
    :aggregate
    :agg
    :agg-function
+   :agg-min
+   :agg-max
    :agg-sum
    :agg-count
    :agg-log-sum
