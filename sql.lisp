@@ -35,6 +35,7 @@ result-p is NIL."
       (map nil (lambda (s) (query s :database database :result-p result-p))
            q)))
 
+(declaim (notinline sql-type))
 (defun sql-type (obj)
   "Infer SQL type from object"
   (typecase obj
