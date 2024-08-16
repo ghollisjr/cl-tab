@@ -1,0 +1,531 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<!-- 2024-08-16 Fri 01:37 -->
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>&lrm;</title>
+<meta name="generator" content="Org Mode" />
+<style>
+  #content { max-width: 60em; margin: auto; }
+  .title  { text-align: center;
+             margin-bottom: .2em; }
+  .subtitle { text-align: center;
+              font-size: medium;
+              font-weight: bold;
+              margin-top:0; }
+  .todo   { font-family: monospace; color: red; }
+  .done   { font-family: monospace; color: green; }
+  .priority { font-family: monospace; color: orange; }
+  .tag    { background-color: #eee; font-family: monospace;
+            padding: 2px; font-size: 80%; font-weight: normal; }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  .org-right  { margin-left: auto; margin-right: 0px;  text-align: right; }
+  .org-left   { margin-left: 0px;  margin-right: auto; text-align: left; }
+  .org-center { margin-left: auto; margin-right: auto; text-align: center; }
+  .underline { text-decoration: underline; }
+  #postamble p, #preamble p { font-size: 90%; margin: .2em; }
+  p.verse { margin-left: 3%; }
+  pre {
+    border: 1px solid #e6e6e6;
+    border-radius: 3px;
+    background-color: #f2f2f2;
+    padding: 8pt;
+    font-family: monospace;
+    overflow: auto;
+    margin: 1.2em;
+  }
+  pre.src {
+    position: relative;
+    overflow: auto;
+  }
+  pre.src:before {
+    display: none;
+    position: absolute;
+    top: -8px;
+    right: 12px;
+    padding: 3px;
+    color: #555;
+    background-color: #f2f2f299;
+  }
+  pre.src:hover:before { display: inline; margin-top: 14px;}
+  /* Languages per Org manual */
+  pre.src-asymptote:before { content: 'Asymptote'; }
+  pre.src-awk:before { content: 'Awk'; }
+  pre.src-authinfo::before { content: 'Authinfo'; }
+  pre.src-C:before { content: 'C'; }
+  /* pre.src-C++ doesn't work in CSS */
+  pre.src-clojure:before { content: 'Clojure'; }
+  pre.src-css:before { content: 'CSS'; }
+  pre.src-D:before { content: 'D'; }
+  pre.src-ditaa:before { content: 'ditaa'; }
+  pre.src-dot:before { content: 'Graphviz'; }
+  pre.src-calc:before { content: 'Emacs Calc'; }
+  pre.src-emacs-lisp:before { content: 'Emacs Lisp'; }
+  pre.src-fortran:before { content: 'Fortran'; }
+  pre.src-gnuplot:before { content: 'gnuplot'; }
+  pre.src-haskell:before { content: 'Haskell'; }
+  pre.src-hledger:before { content: 'hledger'; }
+  pre.src-java:before { content: 'Java'; }
+  pre.src-js:before { content: 'Javascript'; }
+  pre.src-latex:before { content: 'LaTeX'; }
+  pre.src-ledger:before { content: 'Ledger'; }
+  pre.src-lisp:before { content: 'Lisp'; }
+  pre.src-lilypond:before { content: 'Lilypond'; }
+  pre.src-lua:before { content: 'Lua'; }
+  pre.src-matlab:before { content: 'MATLAB'; }
+  pre.src-mscgen:before { content: 'Mscgen'; }
+  pre.src-ocaml:before { content: 'Objective Caml'; }
+  pre.src-octave:before { content: 'Octave'; }
+  pre.src-org:before { content: 'Org mode'; }
+  pre.src-oz:before { content: 'OZ'; }
+  pre.src-plantuml:before { content: 'Plantuml'; }
+  pre.src-processing:before { content: 'Processing.js'; }
+  pre.src-python:before { content: 'Python'; }
+  pre.src-R:before { content: 'R'; }
+  pre.src-ruby:before { content: 'Ruby'; }
+  pre.src-sass:before { content: 'Sass'; }
+  pre.src-scheme:before { content: 'Scheme'; }
+  pre.src-screen:before { content: 'Gnu Screen'; }
+  pre.src-sed:before { content: 'Sed'; }
+  pre.src-sh:before { content: 'shell'; }
+  pre.src-sql:before { content: 'SQL'; }
+  pre.src-sqlite:before { content: 'SQLite'; }
+  /* additional languages in org.el's org-babel-load-languages alist */
+  pre.src-forth:before { content: 'Forth'; }
+  pre.src-io:before { content: 'IO'; }
+  pre.src-J:before { content: 'J'; }
+  pre.src-makefile:before { content: 'Makefile'; }
+  pre.src-maxima:before { content: 'Maxima'; }
+  pre.src-perl:before { content: 'Perl'; }
+  pre.src-picolisp:before { content: 'Pico Lisp'; }
+  pre.src-scala:before { content: 'Scala'; }
+  pre.src-shell:before { content: 'Shell Script'; }
+  pre.src-ebnf2ps:before { content: 'ebfn2ps'; }
+  /* additional language identifiers per "defun org-babel-execute"
+       in ob-*.el */
+  pre.src-cpp:before  { content: 'C++'; }
+  pre.src-abc:before  { content: 'ABC'; }
+  pre.src-coq:before  { content: 'Coq'; }
+  pre.src-groovy:before  { content: 'Groovy'; }
+  /* additional language identifiers from org-babel-shell-names in
+     ob-shell.el: ob-shell is the only babel language using a lambda to put
+     the execution function name together. */
+  pre.src-bash:before  { content: 'bash'; }
+  pre.src-csh:before  { content: 'csh'; }
+  pre.src-ash:before  { content: 'ash'; }
+  pre.src-dash:before  { content: 'dash'; }
+  pre.src-ksh:before  { content: 'ksh'; }
+  pre.src-mksh:before  { content: 'mksh'; }
+  pre.src-posh:before  { content: 'posh'; }
+  /* Additional Emacs modes also supported by the LaTeX listings package */
+  pre.src-ada:before { content: 'Ada'; }
+  pre.src-asm:before { content: 'Assembler'; }
+  pre.src-caml:before { content: 'Caml'; }
+  pre.src-delphi:before { content: 'Delphi'; }
+  pre.src-html:before { content: 'HTML'; }
+  pre.src-idl:before { content: 'IDL'; }
+  pre.src-mercury:before { content: 'Mercury'; }
+  pre.src-metapost:before { content: 'MetaPost'; }
+  pre.src-modula-2:before { content: 'Modula-2'; }
+  pre.src-pascal:before { content: 'Pascal'; }
+  pre.src-ps:before { content: 'PostScript'; }
+  pre.src-prolog:before { content: 'Prolog'; }
+  pre.src-simula:before { content: 'Simula'; }
+  pre.src-tcl:before { content: 'tcl'; }
+  pre.src-tex:before { content: 'TeX'; }
+  pre.src-plain-tex:before { content: 'Plain TeX'; }
+  pre.src-verilog:before { content: 'Verilog'; }
+  pre.src-vhdl:before { content: 'VHDL'; }
+  pre.src-xml:before { content: 'XML'; }
+  pre.src-nxml:before { content: 'XML'; }
+  /* add a generic configuration mode; LaTeX export needs an additional
+     (add-to-list 'org-latex-listings-langs '(conf " ")) in .emacs */
+  pre.src-conf:before { content: 'Configuration File'; }
+
+  table { border-collapse:collapse; }
+  caption.t-above { caption-side: top; }
+  caption.t-bottom { caption-side: bottom; }
+  td, th { vertical-align:top;  }
+  th.org-right  { text-align: center;  }
+  th.org-left   { text-align: center;   }
+  th.org-center { text-align: center; }
+  td.org-right  { text-align: right;  }
+  td.org-left   { text-align: left;   }
+  td.org-center { text-align: center; }
+  dt { font-weight: bold; }
+  .footpara { display: inline; }
+  .footdef  { margin-bottom: 1em; }
+  .figure { padding: 1em; }
+  .figure p { text-align: center; }
+  .equation-container {
+    display: table;
+    text-align: center;
+    width: 100%;
+  }
+  .equation {
+    vertical-align: middle;
+  }
+  .equation-label {
+    display: table-cell;
+    text-align: right;
+    vertical-align: middle;
+  }
+  .inlinetask {
+    padding: 10px;
+    border: 2px solid gray;
+    margin: 10px;
+    background: #ffffcc;
+  }
+  #org-div-home-and-up
+   { text-align: right; font-size: 70%; white-space: nowrap; }
+  textarea { overflow-x: auto; }
+  .linenr { font-size: smaller }
+  .code-highlighted { background-color: #ffff00; }
+  .org-info-js_info-navigation { border-style: none; }
+  #org-info-js_console-label
+    { font-size: 10px; font-weight: bold; white-space: nowrap; }
+  .org-info-js_search-highlight
+    { background-color: #ffff00; color: #000000; font-weight: bold; }
+  .org-svg { }
+</style>
+</head>
+<body>
+<div id="content" class="content">
+<div id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#org675b527">1. Overview</a>
+<ul>
+<li><a href="#org95c549e">1.1. Examples of lsql expressions</a></li>
+</ul>
+</li>
+<li><a href="#org0b3d259">2. Operators</a>
+<ul>
+<li><a href="#org5331b24">2.1. select (sel)</a></li>
+<li><a href="#orgc238966">2.2. group</a></li>
+<li><a href="#org1541d69">2.3. join, to</a></li>
+<li><a href="#orgd783bd6">2.4. order, asc(end)(ing), desc(end)(ing)</a></li>
+<li><a href="#org76e257d">2.5. mapt</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-org675b527" class="outline-2">
+<h2 id="org675b527"><span class="section-number-2">1.</span> Overview</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+lsql is a tool for multi-target, multi-system tabular data analysis
+written as expressions (statements with return values).  The core
+design principles are
+</p>
+
+<ul class="org-ul">
+<li><p>
+Expression-based language: Everything is an expression,
+including objects.  Every expression has a value.
+</p>
+
+<p>
+This is not true for SQL.  E.g.:
+</p>
+<div class="org-src-container">
+<pre class="src src-sql">  select * from tab;
+</pre>
+</div>
+<p>
+returns a table from a table. But:
+</p>
+<div class="org-src-container">
+<pre class="src src-sql">  tab;
+</pre>
+</div>
+<p>
+returns an error since it is not a valid SQL query.
+</p></li>
+<li><p>
+lsql is closed: Every lsql object can be an argument to another
+lsql expression.
+</p>
+
+<p>
+Not true for SQL.  E.g., given t1(x,y) and t2(x,z):
+</p>
+<div class="org-src-container">
+<pre class="src src-sql">  select * from t1 join t2 on t1.x=t2.x
+</pre>
+</div>
+<p>
+returns a table with two columns named "x".  This will be returned
+to you as a "table" from the SQL client, but if you try to use this
+in a CTE or insert the values into a table, the SQL server will
+signal an error since columns must have different names.
+</p></li>
+<li>Multi-server: lsql expressions can refer to data located on any
+system which has been defined, including the host system.  lsql
+expressions can be compiled to execute as SQL queries on SQL servers
+or as Lisp code executed on the host system.</li>
+</ul>
+
+<p>
+The main goal of lsql is ease of data analysis and manipulation across
+multiple systems without the need for explicit transfer code.
+</p>
+</div>
+
+<div id="outline-container-org95c549e" class="outline-3">
+<h3 id="org95c549e"><span class="section-number-3">1.1.</span> Examples of lsql expressions</h3>
+<div class="outline-text-3" id="text-1-1">
+<div class="org-src-container">
+<pre class="src src-sql">-- SQL
+select * from tab
+</pre>
+</div>
+<p>
+In lsql, tables can be returned directly:
+</p>
+<div class="org-src-container">
+<pre class="src src-lisp">;; lsql
+tab
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sql">-- SQL
+select a.x, b.y, c.z
+from a
+join b
+  on a.w = b.w
+join c
+  on b.w = c.w
+</pre>
+</div>
+<p>
+The syntax <code>@&lt;table&gt;(&lt;field1&gt; [field2] [field3]...)</code> is used to denote
+references to a field in a table.  The fields are referenced via
+symbols without evaluation.  (An alternate form is available when
+evaluation is needed to access the field symbol.)
+</p>
+<div class="org-src-container">
+<pre class="src src-lisp">;; lsql
+(sel (@a(x) @b(y) @c(z))
+     (join a
+           (to b (= @a(w) @b(w)))
+           (to c (= @b(w) @c(w)))))
+</pre>
+</div>
+
+<p>
+Some operators from SQL have new aliases for aesthetics:
+</p>
+
+<ul class="org-ul">
+<li><code>like</code>: <code>~=</code>, <code>equalp</code></li>
+<li><code>=</code>:    <code>equal</code></li>
+<li><code>asc</code>:  <code>&lt;=</code>, <code>:asc</code></li>
+<li><code>desc</code>: <code>&gt;=</code>, <code>:desc</code></li>
+</ul>
+
+<p>
+E.g.:
+</p>
+<div class="org-src-container">
+<pre class="src src-sql">-- SQL
+select *
+from tab
+where x like y
+order by z asc
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-lisp">(sel *
+     ;; could just return table without (sel * ...)
+     (order (filter tab (~= x y))
+            z :asc))
+</pre>
+</div>
+
+<p>
+The section <a href="#org0b3d259">Operators</a> has more detailed information on the specific
+operators supported, their syntax and semantics.
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-org0b3d259" class="outline-2">
+<h2 id="org0b3d259"><span class="section-number-2">2.</span> Operators</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+Operators are the fundamental building block of lsql code.
+</p>
+
+<p>
+Operators generally have a publicly exposed macro and some number of
+private functions that provide the implementation of this operator in
+different contexts.
+</p>
+</div>
+<div id="outline-container-org5331b24" class="outline-3">
+<h3 id="org5331b24"><span class="section-number-3">2.1.</span> select (sel)</h3>
+<div class="outline-text-3" id="text-2-1">
+<p>
+<code>select</code> or <code>sel</code> functions much like in SQL where it is used to
+construct tables from scalar values or computations applied to other
+tables.  E.g.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-lisp">;; select * from tab
+(sel * tab)
+</pre>
+</div>
+
+<p>
+References to tables are facilitated via the <code>field</code> data type along
+with a helpful reader syntax:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-lisp">;; select A.X, A.Y from ...
+(sel (@A(X) @B(Y)) ...)
+</pre>
+</div>
+
+<p>
+Named fields use the syntax <code>(name value)</code> in the selection list
+(similar to other Lisp binding operations):
+</p>
+
+<div class="org-src-container">
+<pre class="src src-lisp">;; select A.X as "A_X", B.Y as "B_Y" from ...
+(sel ((A_X @A(X))
+      (B_Y @B(Y)))
+     ...)
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-orgc238966" class="outline-3">
+<h3 id="orgc238966"><span class="section-number-3">2.2.</span> group</h3>
+</div>
+<div id="outline-container-org1541d69" class="outline-3">
+<h3 id="org1541d69"><span class="section-number-3">2.3.</span> join, to</h3>
+</div>
+<div id="outline-container-orgd783bd6" class="outline-3">
+<h3 id="orgd783bd6"><span class="section-number-3">2.4.</span> order, asc(end)(ing), desc(end)(ing)</h3>
+</div>
+<div id="outline-container-org76e257d" class="outline-3">
+<h3 id="org76e257d"><span class="section-number-3">2.5.</span> mapt</h3>
+<div class="outline-text-3" id="text-2-5">
+<p>
+<code>mapt</code> is the lsql table mapping operation.  Mapping is not a SQL
+operation, but it is extremely useful and something that is often
+effectively performed through dynamically-generated SQL queries.
+</p>
+
+<p>
+Ordinarily, mapping takes a list of objects, a function that
+transforms each element, and returns a list which is the result of
+calling the function on each object in the original list.  However,
+because SQL does not directly support nested tabular data, <code>map</code> in
+lsql will perform a <code>union all</code> operation on the results of each
+mapping operation.
+</p>
+
+<p>
+Mapping in general programming would be of little use without the
+ability to define an anonymous function, or &lambda; function in
+computer science parlance.  To that end, the operator <code>lambda</code> has
+been provided as a way to specify a function that accepts some number
+of input arguments that will be used with map.  If the type of
+argument is a table, lsql will intelligently choose a way to achieve
+the computation, be it with dynamic SQL or Lisp code.
+</p>
+
+<p>
+Examples:
+</p>
+<div class="org-src-container">
+<pre class="src src-lisp">;; trivial example
+;;
+;; equivalent to
+;; 
+;; select a.x+b.x as "x",
+;;        a.y+b.y as "y"
+;; from a join b on a.z = b.z
+(mapt (sel ((x (+ @a(x) @b(x)))
+            (y (* @a(y) @b(y)))))
+      (join a (to b (= @a(z) @b(z)))))
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-lisp">;; dynamic SQL example
+;;
+;; This equivalent to generating queries of the form
+;;
+;; select '&lt;table&gt;' as "name", count(1) as "count"
+;; from &lt;table&gt;
+;;
+;; with a value of &lt;table&gt; being a.name for each row in a, and then
+;; performing a union all of the result row from each individual
+;; selection query.  This is a common operation in SQL that requires
+;; dynamically-generated SQL queries using SQL itself or a
+;; programmatical client like Python or Lisp via ODBC.  lsql
+;; eliminates the need for extra complexity:
+(mapt (lambda (tab)
+        (sel ((name @tab(name))
+              (count (agg ((count (count 1)))
+                          (sys1 @tab(name)))))
+              tab))
+      (sel (name)
+           (sys1 a)))
+</pre>
+</div>
+
+<p>
+Notice that <code>sys1</code> occurs as an operator.  Systems that have been
+defined can be used as operators that accept the name of a table as an
+input argument and return a reference to the table.  In this case,
+<code>sys1</code> is used as a contrived example system.
+</p>
+
+<p>
+For convenience, it is also possible to specify a default system in
+which all queries should run unless stated otherwise.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-lisp">(on sys1
+  (mapt (lambda (tab)
+          (sel ((name @tab(name))
+                (count (agg ((count (count 1)))
+                            @tab(name))))
+               tab))
+        (sel (name)
+             a)))
+</pre>
+</div>
+
+<p>
+In this case, there is no need to specify the system in the table
+arguments since sys1 will be used by default.  Operators that accept
+table references as arguments are designed to automatically convert
+symbol/string input values to table references in the default system.
+</p>
+</div>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="date">Created: 2024-08-16 Fri 01:37</p>
+<p class="validation"><a href="https://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>
