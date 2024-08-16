@@ -1,0 +1,215 @@
+* Overview
+lsql is a tool for multi-target, multi-system tabular data analysis
+written as expressions (statements with return values).  The core
+design principles are
+
+- Expression-based language: Everything is an expression,
+  including objects.  Every expression has a value.
+
+  This is not true for SQL.  E.g.:
+  #+begin_src sql
+  select * from tab;
+  #+end_src
+  returns a table from a table. But:
+  #+begin_src sql
+  tab;
+  #+end_src
+  returns an error since it is not a valid SQL query.
+- lsql is closed: Every lsql object can be an argument to another
+  lsql expression.
+  
+  Not true for SQL.  E.g., given t1(x,y) and t2(x,z):
+  #+begin_src sql
+  select * from t1 join t2 on t1.x=t2.x
+  #+end_src
+  returns a table with two columns named "x".  This will be returned
+  to you as a "table" from the SQL client, but if you try to use this
+  in a CTE or insert the values into a table, the SQL server will
+  signal an error since columns must have different names.
+- Multi-server: lsql expressions can refer to data located on any
+  system which has been defined, including the host system.  lsql
+  expressions can be compiled to execute as SQL queries on SQL servers
+  or as Lisp code executed on the host system.
+
+The main goal of lsql is ease of data analysis and manipulation across
+multiple systems without the need for explicit transfer code.
+
+** Examples of lsql expressions
+
+#+begin_src sql
+-- SQL
+select * from tab
+#+end_src
+In lsql, tables can be returned directly:
+#+begin_src lisp
+;; lsql
+tab
+#+end_src
+
+#+begin_src sql
+-- SQL
+select a.x, b.y, c.z
+from a
+join b
+  on a.w = b.w
+join c
+  on b.w = c.w
+#+end_src
+The syntax =@<table>(<field1> [field2] [field3]...)= is used to denote
+references to a field in a table.  The fields are referenced via
+symbols without evaluation.  (An alternate form is available when
+evaluation is needed to access the field symbol.)
+#+begin_src lisp
+;; lsql
+(sel (@a(x) @b(y) @c(z))
+     (join a
+           (to b (= @a(w) @b(w)))
+           (to c (= @b(w) @c(w)))))
+#+end_src
+
+Some operators from SQL have new aliases for aesthetics:
+
+- =like=: =~==, =equalp=
+- ===:    =equal=
+- =asc=:  =<==, =:asc=
+- =desc=: =>==, =:desc=
+
+E.g.:
+#+begin_src sql
+-- SQL
+select *
+from tab
+where x like y
+order by z asc
+#+end_src
+
+#+begin_src lisp
+(sel *
+     ;; could just return table without (sel * ...)
+     (order (filter tab (~= x y))
+            z :asc))
+#+end_src
+
+The section [[*Operators][Operators]] has more detailed information on the specific
+operators supported, their syntax and semantics.
+* Operators
+Operators are the fundamental building block of lsql code.
+
+Operators generally have a publicly exposed macro and some number of
+private functions that provide the implementation of this operator in
+different contexts.
+** select (sel)
+=select= or =sel= functions much like in SQL where it is used to
+construct tables from scalar values or computations applied to other
+tables.  E.g.
+
+#+begin_src lisp
+;; select * from tab
+(sel * tab)
+#+end_src
+
+References to tables are facilitated via the =field= data type along
+with a helpful reader syntax:
+
+#+begin_src lisp
+;; select A.X, A.Y from ...
+(sel (@A(X) @B(Y)) ...)
+#+end_src
+
+Named fields use the syntax =(name value)= in the selection list
+(similar to other Lisp binding operations):
+
+#+begin_src lisp
+;; select A.X as "A_X", B.Y as "B_Y" from ...
+(sel ((A_X @A(X))
+      (B_Y @B(Y)))
+     ...)
+#+end_src
+** group
+** join, to
+** order, asc(end)(ing), desc(end)(ing)
+** mapt
+=mapt= is the lsql table mapping operation.  Mapping is not a SQL
+operation, but it is extremely useful and something that is often
+effectively performed through dynamically-generated SQL queries.
+
+Ordinarily, mapping takes a list of objects, a function that
+transforms each element, and returns a list which is the result of
+calling the function on each object in the original list.  However,
+because SQL does not directly support nested tabular data, =map= in
+lsql will perform a =union all= operation on the results of each
+mapping operation.
+
+Mapping in general programming would be of little use without the
+ability to define an anonymous function, or \lambda function in
+computer science parlance.  To that end, the operator =lambda= has
+been provided as a way to specify a function that accepts some number
+of input arguments that will be used with map.  If the type of
+argument is a table, lsql will intelligently choose a way to achieve
+the computation, be it with dynamic SQL or Lisp code.
+
+Examples:
+#+begin_src lisp
+;; trivial example
+;;
+;; equivalent to
+;; 
+;; select a.x+b.x as "x",
+;;        a.y+b.y as "y"
+;; from a join b on a.z = b.z
+(mapt (sel ((x (+ @a(x) @b(x)))
+            (y (* @a(y) @b(y)))))
+      (join a (to b (= @a(z) @b(z)))))
+#+end_src
+
+#+begin_src lisp
+;; dynamic SQL example
+;;
+;; This equivalent to generating queries of the form
+;;
+;; select '<table>' as "name", count(1) as "count"
+;; from <table>
+;;
+;; with a value of <table> being a.name for each row in a, and then
+;; performing a union all of the result row from each individual
+;; selection query.  This is a common operation in SQL that requires
+;; dynamically-generated SQL queries using SQL itself or a
+;; programmatical client like Python or Lisp via ODBC.  lsql
+;; eliminates the need for extra complexity:
+(mapt (lambda (tab)
+        (sel ((name @tab(name))
+              (count (agg ((count (count 1)))
+                          (sys1 @tab(name)))))
+              tab))
+      (sel (name)
+           (sys1 a)))
+#+end_src
+
+Notice that =sys1= occurs as an operator.  Systems that have been
+defined can be used as operators that accept the name of a table as an
+input argument and return a reference to the table.  In this case,
+=sys1= is used as a contrived example system.
+
+For convenience, it is also possible to specify a default system in
+which all queries should run unless stated otherwise.
+
+#+begin_src lisp
+(on sys1
+  (mapt (lambda (tab)
+          (sel ((name @tab(name))
+                (count (agg ((count (count 1)))
+                            @tab(name))))
+               tab))
+        (sel (name)
+             a)))
+#+end_src
+
+In this case, there is no need to specify the system in the table
+arguments since sys1 will be used by default.  Operators that accept
+table references as arguments are designed to automatically convert
+symbol/string input values to table references in the default system.
+
+In the event that tables exist on multiple systems, lsql will decide
+how to accomplish the computation with minimal data transfer required
+since I/O will almost always be the bottleneck for long table
+operations.
