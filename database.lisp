@@ -7,12 +7,16 @@
   connection)
 
 (defmacro define-database (symbol
+                           properties
                            &body connection-body)
   "Defines a new function bound to symbol which controls a smart database
 connection object.  The idea is to define a database connection, and
 then call that function with a query whenever you want to run queries
 against that database.  However, unless the function is actually
 called, no connections to the database are attempted.
+
+properties is a let-like symbol-binding list for properties about the
+database.  Standard properties are :url, :name, :connection-string.
 
 Lists of queries are also supported.
 
@@ -25,6 +29,9 @@ the connection will be restarted."
   (alexandria:with-gensyms (c cfn)
     `(let ((,c nil)
            (,cfn (lambda () ,@connection-body)))
+       ,@(loop
+           for prop in properties
+           collect `(setf (get ',symbol ',(first prop)) ,(second prop)))
        (defun ,symbol (query-or-op &optional (result-p t))
          "Controls a smart database connection object.  Call this function with
 a query whenever you want to run queries against that database.
